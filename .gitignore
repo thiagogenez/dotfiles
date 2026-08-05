@@ -1,0 +1,16 @@
+# Never track key material, credentials, or host records
+id_*
+*.pub
+*.pem
+*.key
+*.p12
+*.pfx
+*.kdbx
+known_hosts*
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+*.bak.*

@@ -1,0 +1,20 @@
+[user]
+	useConfigOnly = true
+[alias]
+	st = status
+	fpush = push --force-with-lease
+[fetch]
+	prune = true
+[rebase]
+	autoStash = true
+[core]
+	editor = subl -n -w
+	commentChar = %
+[init]
+	defaultBranch = main
+[commit]
+	gpgsign = true
+
+# Optional private overlay.
+[include]
+	path = ~/.dotfiles-private/git/config
