@@ -59,6 +59,9 @@ The public Git and SSH files include these paths when they exist. Without the ov
 common settings continue to work, but no Git identity is supplied.
 `user.useConfigOnly = true` prevents commits with an inferred email address.
 
+See [Create a private overlay](docs/private-overlay.md) for a complete example using
+your own private repository, identities, signing configuration, and SSH defaults.
+
 ## Uninstall
 
 From anywhere:
