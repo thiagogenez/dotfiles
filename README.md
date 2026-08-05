@@ -1,6 +1,7 @@
 # dotfiles
 
-Reusable Git and SSH configuration with optional support for a private local overlay.
+Reusable Git, SSH, and GnuPG configuration with optional support for a private
+local overlay.
 
 ## Contents
 
@@ -16,8 +17,9 @@ Reusable Git and SSH configuration with optional support for a private local ove
 git/config     \
 git/ignore      > ~/.config/git -> <clone>/git
 ssh/config     -> ~/.ssh/config
-install.sh        creates the two symlinks above
-uninstall.sh      removes them and restores prior configuration
+gnupg/            documents the optional private GnuPG component
+install.sh        interactively installs selected components
+uninstall.sh      removes selected components and restores prior configuration
 ```
 
 Git discovers `~/.config/git/config` and `~/.config/git/ignore` natively. Both Git
@@ -32,10 +34,19 @@ On a new machine:
 git clone https://github.com/thiagogenez/dotfiles.git "$HOME/.dotfiles" && "$HOME/.dotfiles/install.sh"
 ```
 
-From an existing clone:
+From an existing clone, launch the interactive selector:
 
 ```bash
 ./install.sh
+```
+
+Use the keyboard to select Git, SSH, and—when its private configuration
+exists—GnuPG. For scripts or unattended setup, name components explicitly or
+install everything available:
+
+```bash
+./install.sh git ssh
+./install.sh --all
 ```
 
 Re-running is safe. Existing files, directories, or symlinks are preserved under
@@ -51,20 +62,27 @@ Optional machine-specific configuration can be placed at:
 ~/.dotfiles-private/
 ├── git/
 │   └── config
+├── gnupg/
+│   └── gpg-agent.conf
 └── ssh/
     └── config
 ```
 
 The public Git and SSH files include these paths when they exist. Without the overlay,
-common settings continue to work, but no Git identity is supplied.
+common settings continue to work, but no Git identity is supplied. Because
+`gpg-agent.conf` has no config-include directive, the optional GnuPG component
+links that private file directly instead of passing through a public file.
 `user.useConfigOnly = true` prevents commits with an inferred email address.
+
+The installer only manages the GnuPG configuration link. It does not install
+GnuPG, pinentry software, private keys, or Keychain credentials.
 
 See [Create a private overlay](docs/private-overlay.md) for a complete example using
 your own private repository, identities, signing configuration, and SSH defaults.
 
 ## Uninstall
 
-From anywhere:
+From anywhere, select which installed components to remove:
 
 ```bash
 "$HOME/.dotfiles/uninstall.sh"
@@ -76,10 +94,17 @@ From inside the clone:
 ./uninstall.sh
 ```
 
-Uninstall removes only `~/.config/git` and `~/.ssh/config` symlinks that point into
-this clone, then restores whatever occupied those paths before installation. Files or
-links placed there by something else after installation are left untouched, and the
-preserved backups remain available for manual recovery. The clone is never deleted.
+For unattended removal:
+
+```bash
+./uninstall.sh --all
+```
+
+Uninstall removes only selected symlinks that still point to the source managed
+by this clone or its private overlay, then restores whatever occupied those paths
+before installation. Files or links placed there by something else after
+installation are left untouched, and preserved backups remain available for
+manual recovery. The clone is never deleted.
 
 ## Safety
 

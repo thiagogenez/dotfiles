@@ -12,7 +12,7 @@ path used by the public configuration:
 ```bash
 gh repo create YOUR_GITHUB_USER/dotfiles-private --private
 gh repo clone YOUR_GITHUB_USER/dotfiles-private "$HOME/.dotfiles-private"
-mkdir -p "$HOME/.dotfiles-private/git" "$HOME/.dotfiles-private/ssh"
+mkdir -p "$HOME/.dotfiles-private/git" "$HOME/.dotfiles-private/ssh" "$HOME/.dotfiles-private/gnupg"
 ```
 
 The repository name is only a suggestion. If you use another local path, update the
@@ -24,14 +24,14 @@ Create `~/.dotfiles-private/git/config`:
 
 ```gitconfig
 [user]
-	name = Your Name
+    name = Your Name
 
 [includeIf "hasconfig:remote.*.url:git@github.com:YOUR_GITHUB_USER/**"]
-	path = ~/.dotfiles-private/git/personal
+    path = ~/.dotfiles-private/git/personal
 [includeIf "hasconfig:remote.*.url:https://github.com/YOUR_GITHUB_USER/**"]
-	path = ~/.dotfiles-private/git/personal
+    path = ~/.dotfiles-private/git/personal
 [includeIf "gitdir:~/work/"]
-	path = ~/.dotfiles-private/git/work
+    path = ~/.dotfiles-private/git/work
 ```
 
 Adjust the remote and directory patterns to match your repositories. Git silently
@@ -43,20 +43,20 @@ For SSH signing, create `~/.dotfiles-private/git/personal`:
 
 ```gitconfig
 [user]
-	email = YOUR_EMAIL
-	signingkey = ~/.ssh/id_ed25519.pub
+    email = YOUR_EMAIL
+    signingkey = ~/.ssh/id_ed25519.pub
 [gpg]
-	format = ssh
+    format = ssh
 ```
 
 For OpenPGP signing, create `~/.dotfiles-private/git/work`:
 
 ```gitconfig
 [user]
-	email = YOUR_WORK_EMAIL
-	signingkey = YOUR_OPENPGP_KEY_ID
+    email = YOUR_WORK_EMAIL
+    signingkey = YOUR_OPENPGP_KEY_ID
 [gpg]
-	format = openpgp
+    format = openpgp
 ```
 
 The public configuration enables signed commits. If you do not want signing, override
@@ -64,7 +64,7 @@ it in the private `git/config`:
 
 ```gitconfig
 [commit]
-	gpgsign = false
+    gpgsign = false
 ```
 
 Never store private keys, tokens, passwords, or recovery material in either
@@ -83,17 +83,31 @@ Host *.example.com
 
 The public SSH configuration includes this file automatically when it exists.
 
-## 5. Add optional private ignore rules
+## 5. Add optional GnuPG agent configuration
+
+GnuPG does not support an SSH-style include in `gpg-agent.conf`. To manage it
+through the private overlay, create `~/.dotfiles-private/gnupg/gpg-agent.conf`
+with the agent options needed on your machine. For example:
+
+```text
+pinentry-program /absolute/path/to/your/pinentry
+```
+
+Then run `./install.sh` and select GnuPG. The installer links the private file
+directly to `~/.gnupg/gpg-agent.conf`; it does not install GnuPG, pinentry,
+private keys, or credentials.
+
+## 6. Add optional private ignore rules
 
 Create `~/.dotfiles-private/git/ignore` for patterns that should not appear in the
 public repository, then select it from the private `git/config`:
 
 ```gitconfig
 [core]
-	excludesfile = ~/.dotfiles-private/git/ignore
+    excludesfile = ~/.dotfiles-private/git/ignore
 ```
 
-## 6. Save the private overlay
+## 7. Save the private overlay
 
 Commit and push the overlay only after confirming that its GitHub repository is
 private:
