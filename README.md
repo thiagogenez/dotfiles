@@ -26,6 +26,12 @@ Git discovers `~/.config/git/config` and `~/.config/git/ignore` natively. Both G
 and SSH can load additional machine-specific configuration from the optional private
 overlay.
 
+This project uses Git's [XDG configuration location](https://git-scm.com/docs/git-config)
+instead of the traditional `~/.gitconfig`. XDG keeps user configuration under
+`$XDG_CONFIG_HOME`, which defaults to `~/.config`; see the
+[XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/)
+for the convention and its other standard directories.
+
 ## Install
 
 On a new machine:
