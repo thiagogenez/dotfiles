@@ -28,7 +28,9 @@ assert_link() {
 
 assert_absent() {
     local target="$1"
-    [ ! -e "$target" ] && [ ! -L "$target" ] || fail "$target still exists"
+    if [ -e "$target" ] || [ -L "$target" ]; then
+        fail "$target still exists"
+    fi
 }
 
 trap cleanup EXIT
