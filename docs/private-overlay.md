@@ -12,11 +12,14 @@ path used by the public configuration:
 ```bash
 gh repo create YOUR_GITHUB_USER/dotfiles-private --private
 gh repo clone YOUR_GITHUB_USER/dotfiles-private "$HOME/.dotfiles-private"
-mkdir -p "$HOME/.dotfiles-private/git" "$HOME/.dotfiles-private/ssh" "$HOME/.dotfiles-private/gnupg"
+mkdir -p \
+  "$HOME/.dotfiles-private/git" \
+  "$HOME/.dotfiles-private/ssh" \
+  "$HOME/.dotfiles-private/gnupg"
 ```
 
-The repository name is only a suggestion. If you use another local path, update the
-include paths in the public `git/config` and `ssh/config` files.
+The repository name is only a suggestion. If you use another local path, update
+the include paths in the public `git/config` and `ssh/config` files.
 
 ## 2. Add private Git routing
 
@@ -73,8 +76,8 @@ remain in an SSH agent, credential manager, or local keyring.
 
 ## 4. Add optional SSH defaults
 
-Create `~/.dotfiles-private/ssh/config` only when private host or user settings are
-needed:
+Create `~/.dotfiles-private/ssh/config` only when private host or user settings
+are needed:
 
 ```sshconfig
 Host *.example.com
@@ -120,5 +123,5 @@ git commit -S -m "Add private dotfiles overlay"
 git push -u origin main
 ```
 
-The public `uninstall.sh` removes only the symlinks it installed. It never deletes the
-private overlay repository.
+The public `uninstall.sh` removes only the symlinks it installed. It never deletes
+the private overlay repository.

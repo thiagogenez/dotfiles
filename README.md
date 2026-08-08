@@ -1,5 +1,8 @@
 # dotfiles
 
+[![CI](https://github.com/thiagogenez/dotfiles/actions/workflows/ci.yml/badge.svg)](https://github.com/thiagogenez/dotfiles/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Reusable Git, SSH, and GnuPG configuration with optional support for a private
 local overlay.
 
@@ -9,7 +12,9 @@ local overlay.
 - [Install](#install)
 - [Private overlay](#private-overlay)
 - [Uninstall](#uninstall)
+- [Development](#development)
 - [Safety](#safety)
+- [License](#license)
 
 ## Layout
 
@@ -57,8 +62,8 @@ install everything available:
 
 Re-running is safe. Existing files, directories, or symlinks are preserved under
 `~/.local/state/dotfiles-installer/backups/` before installation. `git config
---global` writes through the XDG symlink to `git/config`, so edits made with Git itself
-land in version control.
+--global` writes through the XDG symlink to `git/config`, so edits made with Git
+itself land in version control.
 
 ## Private overlay
 
@@ -112,8 +117,25 @@ before installation. Files or links placed there by something else after
 installation are left untouched, and preserved backups remain available for
 manual recovery. The clone is never deleted.
 
+## Development
+
+Run the local checks with:
+
+```bash
+shellcheck -x install.sh uninstall.sh lib/dotfiles.sh tests/*.sh
+bash tests/install-uninstall.sh
+```
+
+GitHub Actions runs ShellCheck, Markdownlint, and the complete install/uninstall
+lifecycle on Ubuntu and macOS. The lifecycle test uses isolated temporary home and
+state directories; it never modifies the runner's real user configuration.
+
 ## Safety
 
-No private key material, credentials, identity values, or host-specific defaults are
-stored in this repository. Keep secrets in a dedicated credential manager or local
-keyring, never in Git.
+No private key material, credentials, identity values, or host-specific defaults
+are stored in this repository. Keep secrets in a dedicated credential manager or
+local keyring, never in Git.
+
+## License
+
+Released under the [MIT License](LICENSE).

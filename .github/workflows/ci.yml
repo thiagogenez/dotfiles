@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Run ShellCheck
+        run: shellcheck -x install.sh uninstall.sh lib/dotfiles.sh tests/*.sh
+
+      - name: Run Markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v24
+        with:
+          globs: "**/*.md"
+
+  lifecycle:
+    name: Install and uninstall (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Test installer lifecycle
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            PATH=/bin:/usr/bin /bin/bash tests/install-uninstall.sh
+          else
+            /bin/bash tests/install-uninstall.sh
+          fi
