@@ -1,0 +1,39 @@
+name: Fix
+description: Something behaves incorrectly
+labels: ["fix"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What behaves incorrectly, and under what conditions.
+    validations:
+      required: true
+
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behaviour
+      description: >
+        What actually happens. Paste the command and its output. Include the error text
+        verbatim rather than describing it.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: >
+        Operating system and version, Bash version, and where the checkout lives if that
+        is relevant.
+    validations:
+      required: false

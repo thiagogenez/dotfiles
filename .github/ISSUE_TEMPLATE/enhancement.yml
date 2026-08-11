@@ -1,0 +1,29 @@
+name: Enhancement
+description: Improve behaviour that already exists
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Rationale
+      description: What is inconvenient, fragile, or unclear about the current behaviour.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should change. Be specific enough that someone else could implement it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: >
+        Anything the change must not do. Bash 3.2 compatibility, no new runtime
+        dependencies, and no reformatting unrelated code are common ones here.
+    validations:
+      required: false
