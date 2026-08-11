@@ -1,0 +1,40 @@
+name: Feature
+description: Add a capability that does not exist yet
+labels: ["feature"]
+body:
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Rationale
+      description: What problem this solves, and who has it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What the capability does and how it behaves.
+    validations:
+      required: true
+
+  - type: textarea
+    id: fit
+    attributes:
+      label: Fit
+      description: >
+        This project is a Bash installer with no service, runtime, or frontend. Explain
+        what this has to act on here. Tooling aimed at long-running applications usually
+        has no target in this repository.
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: >
+        Bash 3.2 compatibility, no new runtime dependencies, and anything else the
+        implementation must respect.
+    validations:
+      required: false
