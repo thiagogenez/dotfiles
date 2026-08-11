@@ -112,8 +112,8 @@ private keys, or credentials. `./update.sh` restarts the agent when this file ch
 
 ## 6. Add optional private ignore rules
 
-Create `git/ignore` in the private checkout for patterns that should not appear in
-the public repository, then select it from the private `git/config`:
+Create `git/ignore` in the private checkout for patterns that should not appear
+in the public repository, then select it from the private `git/config`:
 
 ```gitconfig
 [core]
