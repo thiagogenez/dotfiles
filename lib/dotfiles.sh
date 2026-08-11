@@ -55,7 +55,7 @@ dotfiles_component_target() {
 
 dotfiles_component_known() {
     case "$1" in
-        git|ssh|gnupg) return 0 ;;
+        git | ssh | gnupg) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -287,7 +287,7 @@ dotfiles_interactive_selection() {
                 done
                 ;;
             '') break ;;
-            q|Q)
+            q | Q)
                 printf '\n%s cancelled.\n' "$action" >&4
                 exec 3>&- 4>&-
                 return 130
@@ -522,7 +522,7 @@ dotfiles_remove_prefix() {
     local prefix="$1"
 
     case "$prefix" in
-        "$DOTFILES_DATA_HOME"/dotfiles|"$DOTFILES_DATA_HOME"/dotfiles-private) ;;
+        "$DOTFILES_DATA_HOME"/dotfiles | "$DOTFILES_DATA_HOME"/dotfiles-private) ;;
         *) return 0 ;;
     esac
 
@@ -687,7 +687,7 @@ dotfiles_main() {
     shift 2 || true
 
     case "$action" in
-        install|uninstall|update) ;;
+        install | uninstall | update) ;;
         *)
             echo "Internal error: expected install or uninstall" >&2
             return 2

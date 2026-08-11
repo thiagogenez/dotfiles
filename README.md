@@ -179,12 +179,20 @@ Run the local checks with:
 
 ```bash
 shellcheck -x install.sh update.sh uninstall.sh lib/dotfiles.sh tests/*.sh
+shfmt -d -i 4 -ci -kp install.sh update.sh uninstall.sh lib/dotfiles.sh tests/*.sh
 bash tests/install-uninstall.sh
+bash tests/architecture.sh
+bash tests/commit-message.sh
 ```
 
-GitHub Actions runs ShellCheck, Markdownlint, and the complete install/uninstall
-lifecycle on Ubuntu and macOS. The lifecycle test uses isolated temporary home
-and state directories; it never modifies the runner's real user configuration.
+GitHub Actions runs ShellCheck, shfmt, Markdownlint, secret scanning, commit
+message validation, and the complete install/uninstall lifecycle on Ubuntu and
+macOS. The lifecycle and architecture tests use isolated temporary home and
+state directories; they never modify the runner's real user configuration.
+
+These are contributor and CI tools. Running the installer itself needs bash and
+git and nothing else. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow
+and [AGENTS.md](AGENTS.md) for the rules coding agents follow here.
 
 ## Safety
 
