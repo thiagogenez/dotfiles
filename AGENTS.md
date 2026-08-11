@@ -94,8 +94,21 @@ markdownlint holds to 80 columns.
 
 ## Commits
 
-Follow Conventional Commits: `fix:`, `feat:`, `docs:`, `ci:`, `test:`,
-`refactor:`, `chore:`.
+Conventional Commits, written terse.
+
+- `<type>(<scope>): <imperative summary>`, at most 50 characters, hard cap 72
+- Types: `fix`, `feat`, `docs`, `ci`, `test`, `refactor`, `chore`, `perf`,
+  `build`, `style`, `revert`
+- Imperative mood: "add", "fix", "remove", never "added" or "adds"
+- Lowercase after the colon, and no trailing period
+- Body only when the diff does not make the reason obvious, wrapped at 72
+- Always a body for breaking changes, security fixes, migrations, and reverts,
+  because whoever debugs one of those later needs the context
+- Reference issues at the end: `Closes #42`, `Refs #17`
+- Leave out "this commit does X", first person, and AI attribution
+
+`tests/commit-message.sh` checks what is mechanically checkable. Imperative mood
+is not, so it stays a convention the check cannot enforce for you.
 
 Commits are signed by the repository owner. Agents must not run `git commit`,
 `git commit --amend`, `git rebase`, or anything else that creates or rewrites
@@ -108,8 +121,22 @@ Run these before opening a pull request:
 
 ```bash
 shellcheck -x install.sh update.sh uninstall.sh lib/dotfiles.sh tests/*.sh
+shfmt -d -i 4 -ci -kp install.sh update.sh uninstall.sh lib/dotfiles.sh tests/*.sh
 bash tests/install-uninstall.sh
+bash tests/architecture.sh
+bash tests/commit-message.sh
 ```
+
+`shellcheck` covers correctness and `shfmt` covers layout; they do not overlap.
+Install both with your package manager, for example `brew install shellcheck
+shfmt`. Neither is required to contribute: CI runs the same commands, and
+skipping them locally only costs a round trip.
+
+Nothing in this pipeline may become a runtime dependency of the installer.
+`install.sh` runs with bash and git alone, and it has to stay that way, because
+it manages SSH and GnuPG configuration on machines that may have nothing else
+installed. Tools belong in CI and on contributor machines, never in the
+installer's execution path.
 
 The lifecycle test uses temporary home and state directories and never touches
 real user configuration. It also sets `DOTFILES_PRIVATE_ROOT` to a path that

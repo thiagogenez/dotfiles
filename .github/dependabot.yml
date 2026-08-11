@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # One pull request instead of several: on a repository this size, separate
+    # ones for each action are noise rather than signal.
+    groups:
+      actions:
+        patterns:
+          - "*"
+    labels:
+      - enhancement
+    commit-message:
+      prefix: ci

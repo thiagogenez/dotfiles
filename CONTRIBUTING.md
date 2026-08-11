@@ -48,13 +48,28 @@ Target Bash 3.2, which is what macOS ships. Associative arrays, `mapfile`, and
 
 ```bash
 shellcheck -x install.sh update.sh uninstall.sh lib/dotfiles.sh tests/*.sh
+shfmt -d -i 4 -ci -kp install.sh update.sh uninstall.sh lib/dotfiles.sh tests/*.sh
 bash tests/install-uninstall.sh
+bash tests/architecture.sh
+bash tests/commit-message.sh
 ```
+
+None of this is required to contribute. CI runs the same commands, so skipping
+them locally costs you a round trip and nothing else. If you do want them,
+`brew install shellcheck shfmt` covers the two that are not already on your
+machine; both are single binaries with no dependency tree.
+
+`shellcheck` covers correctness and `shfmt` covers layout, so they do not
+overlap. These are contributor and CI tools only. Running the installer needs
+bash and git, nothing more, and that must stay true.
 
 The lifecycle test builds temporary home and state directories and never touches
 your real configuration. It also points `DOTFILES_PRIVATE_ROOT` at a path that
 does not exist, so a private overlay sitting next to the checkout cannot leak
 into the fixtures. Please keep that property when adding tests.
+
+`tests/architecture.sh` asserts the boundary described below. `tests/commit-message.sh`
+checks commit subjects, and accepts a range or `--text "subject"` for a single one.
 
 Markdown files are checked with markdownlint, which limits lines to 80
 characters. Issue and pull request bodies are not files and should not be
@@ -76,8 +91,13 @@ weakened to make a change pass.
 ## Pull requests
 
 Write the title as a Conventional Commit; a squash merge takes it as the
-subject. In the body, cover the linked issue, what changed, how you validated
-it, and any risks, limitations, or open questions.
+subject, so CI checks the title under the same rules as the commits. Keep the
+subject at 50 characters where you can, 72 at the outside, lowercase after the
+colon, with no trailing period. Add a body only when the diff does not explain
+why, and always for breaking changes, security fixes, and reverts.
+
+In the body of the pull request, cover the linked issue, what changed, how you
+validated it, and any risks, limitations, or open questions.
 
 On validation: name the commands and their results rather than writing "tests
 pass". If you checked something by hand, describe what you looked at.

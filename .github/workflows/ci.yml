@@ -3,10 +3,22 @@ name: CI
 on:
   push:
   pull_request:
+  schedule:
+    # Weekly, so a secret committed long ago is still found even if no pull
+    # request touches the repository.
+    - cron: "0 6 * * 1"
   workflow_dispatch:
 
 permissions:
   contents: read
+
+env:
+  # Binaries are pinned and checksum-verified rather than pulled through a
+  # third-party action, so the supply chain here is GitHub releases only.
+  SHFMT_VERSION: v3.13.1
+  SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
+  GITLEAKS_VERSION: 8.30.1
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
 
 jobs:
   lint:
@@ -19,10 +31,62 @@ jobs:
       - name: Run ShellCheck
         run: shellcheck -x install.sh update.sh uninstall.sh lib/dotfiles.sh tests/*.sh
 
+      - name: Install shfmt
+        run: |
+          curl -fsSL -o /tmp/shfmt \
+            "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_amd64"
+          echo "${SHFMT_SHA256}  /tmp/shfmt" | sha256sum -c -
+          chmod +x /tmp/shfmt
+
+      - name: Check formatting
+        run: /tmp/shfmt -d -i 4 -ci -kp install.sh update.sh uninstall.sh lib/dotfiles.sh tests/*.sh
+
       - name: Run Markdownlint
         uses: DavidAnson/markdownlint-cli2-action@v24
         with:
           globs: "**/*.md"
+
+  commit-messages:
+    name: Commit messages
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check the commits this pull request adds
+        run: |
+          bash tests/commit-message.sh \
+            "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+
+      - name: Check the pull request title
+        # A squash merge takes the title as the commit subject, so it has to
+        # satisfy the same rules as the commits themselves.
+        run: bash tests/commit-message.sh --text "${{ github.event.pull_request.title }}"
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          # Full history: the point is to catch a secret committed at any time,
+          # not only one added by the change under review.
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          curl -fsSL -o /tmp/gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  /tmp/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          chmod +x /tmp/gitleaks
+
+      - name: Scan history
+        run: /tmp/gitleaks git --no-banner --redact --verbose .
 
   lifecycle:
     name: Install and uninstall (${{ matrix.os }})
@@ -44,3 +108,38 @@ jobs:
           else
             /bin/bash tests/install-uninstall.sh
           fi
+
+      - name: Assert the architecture invariant
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            PATH=/bin:/usr/bin /bin/bash tests/architecture.sh
+          else
+            /bin/bash tests/architecture.sh
+          fi
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install kcov
+        run: sudo apt-get update && sudo apt-get install -y kcov
+
+      - name: Run the suites under kcov
+        # kcov instruments the interpreter, so lib/dotfiles.sh is measured even
+        # though the tests reach it through install.sh.
+        run: |
+          kcov --include-path=lib,install.sh,update.sh,uninstall.sh \
+            coverage tests/install-uninstall.sh
+          kcov --include-path=lib,install.sh,update.sh,uninstall.sh \
+            coverage tests/architecture.sh
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          directory: coverage
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
