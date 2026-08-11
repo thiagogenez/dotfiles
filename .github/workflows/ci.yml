@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run ShellCheck
-        run: shellcheck -x install.sh uninstall.sh lib/dotfiles.sh tests/*.sh
+        run: shellcheck -x install.sh update.sh uninstall.sh lib/dotfiles.sh tests/*.sh
 
       - name: Run Markdownlint
         uses: DavidAnson/markdownlint-cli2-action@v24
