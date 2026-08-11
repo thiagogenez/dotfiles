@@ -6,43 +6,51 @@ them in a public commit.
 
 ## 1. Create and clone a private repository
 
-Create a private repository in your own GitHub account, then clone it to the fixed
-path used by the public configuration:
+Create a private repository in your own GitHub account, then clone it beside the
+public checkout, which is where the installer looks for it by default:
 
 ```bash
+public="$(cd "$(dirname "$0")" && pwd)"   # or the path you cloned dotfiles into
 gh repo create YOUR_GITHUB_USER/dotfiles-private --private
-gh repo clone YOUR_GITHUB_USER/dotfiles-private "$HOME/.dotfiles-private"
-mkdir -p \
-  "$HOME/.dotfiles-private/git" \
-  "$HOME/.dotfiles-private/ssh" \
-  "$HOME/.dotfiles-private/gnupg"
+gh repo clone YOUR_GITHUB_USER/dotfiles-private "$(dirname "$public")/dotfiles-private"
 ```
 
-The repository name is only a suggestion. If you use another local path, update
-the include paths in the public `git/config` and `ssh/config` files.
+Set `DOTFILES_PRIVATE_ROOT` if you keep it elsewhere.
+
+Two paths matter throughout this document and they are not the same:
+
+- The **checkout**, where you create and commit these files.
+- `~/.local/share/dotfiles-private`, the copy `install.sh` publishes and the only
+  path that belongs inside an include directive.
+
+Never point an include at the checkout. Publishing exists so that nothing under
+`$HOME` depends on where the checkout lives.
 
 ## 2. Add private Git routing
 
-Create `~/.dotfiles-private/git/config`:
+Create `git/config` in the private checkout:
 
 ```gitconfig
 [user]
     name = Your Name
 
 [includeIf "hasconfig:remote.*.url:git@github.com:YOUR_GITHUB_USER/**"]
-    path = ~/.dotfiles-private/git/personal
+    path = ~/.local/share/dotfiles-private/git/personal
 [includeIf "hasconfig:remote.*.url:https://github.com/YOUR_GITHUB_USER/**"]
-    path = ~/.dotfiles-private/git/personal
+    path = ~/.local/share/dotfiles-private/git/personal
 [includeIf "gitdir:~/work/"]
-    path = ~/.dotfiles-private/git/work
+    path = ~/.local/share/dotfiles-private/git/work
 ```
 
 Adjust the remote and directory patterns to match your repositories. Git silently
 ignores include conditions that do not match.
 
+A `gitdir` condition matches where a repository lives on disk, so it keeps naming
+your working directories. Only `path` values move to the published location.
+
 ## 3. Add identities and signing
 
-For SSH signing, create `~/.dotfiles-private/git/personal`:
+For SSH signing, create `git/personal` in the private checkout:
 
 ```gitconfig
 [user]
@@ -52,7 +60,7 @@ For SSH signing, create `~/.dotfiles-private/git/personal`:
     format = ssh
 ```
 
-For OpenPGP signing, create `~/.dotfiles-private/git/work`:
+For OpenPGP signing, create `git/work` in the private checkout:
 
 ```gitconfig
 [user]
@@ -76,7 +84,7 @@ remain in an SSH agent, credential manager, or local keyring.
 
 ## 4. Add optional SSH defaults
 
-Create `~/.dotfiles-private/ssh/config` only when private host or user settings
+Create `ssh/config` in the private checkout only when private host or user settings
 are needed:
 
 ```sshconfig
@@ -84,44 +92,56 @@ Host *.example.com
     User your-user
 ```
 
-The public SSH configuration includes this file automatically when it exists.
+The public SSH configuration includes the published copy automatically when it
+exists. Order matters: a more specific `Host` block must come before a broader one,
+because SSH keeps the first value it finds for each keyword.
 
 ## 5. Add optional GnuPG agent configuration
 
 GnuPG does not support an SSH-style include in `gpg-agent.conf`. To manage it
-through the private overlay, create `~/.dotfiles-private/gnupg/gpg-agent.conf`
+through the private overlay, create `gnupg/gpg-agent.conf` in the private checkout
 with the agent options needed on your machine. For example:
 
 ```text
 pinentry-program /absolute/path/to/your/pinentry
 ```
 
-Then run `./install.sh` and select GnuPG. The installer links the private file
-directly to `~/.gnupg/gpg-agent.conf`; it does not install GnuPG, pinentry,
-private keys, or credentials.
+Then run `./install.sh` and select GnuPG. The installer publishes the file and links
+`~/.gnupg/gpg-agent.conf` at the published copy; it does not install GnuPG, pinentry,
+private keys, or credentials. `./update.sh` restarts the agent when this file changes.
 
 ## 6. Add optional private ignore rules
 
-Create `~/.dotfiles-private/git/ignore` for patterns that should not appear in the
-public repository, then select it from the private `git/config`:
+Create `git/ignore` in the private checkout for patterns that should not appear in
+the public repository, then select it from the private `git/config`:
 
 ```gitconfig
 [core]
-    excludesfile = ~/.dotfiles-private/git/ignore
+    excludesfile = ~/.local/share/dotfiles-private/git/ignore
 ```
 
-## 7. Save the private overlay
+## 7. Publish and save the private overlay
+
+Publish the overlay so the include paths resolve:
+
+```bash
+./update.sh          # or ./install.sh on first setup
+git config --list --show-origin | grep dotfiles-private
+```
 
 Commit and push the overlay only after confirming that its GitHub repository is
 private:
 
 ```bash
-cd "$HOME/.dotfiles-private"
+cd /path/to/dotfiles-private
 gh repo view --json visibility
 git add .
 git commit -S -m "Add private dotfiles overlay"
 git push -u origin main
 ```
 
-The public `uninstall.sh` removes only the symlinks it installed. It never deletes
-the private overlay repository.
+Remember that editing the checkout has no effect until `./update.sh`
+republishes it.
+
+The public `uninstall.sh` removes the symlinks it installed and the copies it
+published. It never deletes either checkout.
