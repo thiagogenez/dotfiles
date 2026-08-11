@@ -48,7 +48,7 @@ assert_no_link_into_source() {
     while IFS= read -r link; do
         [ -n "$link" ] || continue
         case "$(readlink "$link")" in
-            "$repo"|"$repo"/*) fail "$link resolves into the source checkout" ;;
+            "$repo" | "$repo"/*) fail "$link resolves into the source checkout" ;;
         esac
     done <<EOF
 $(find "$home" -type l 2>/dev/null)
