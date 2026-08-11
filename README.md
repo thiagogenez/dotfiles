@@ -186,10 +186,9 @@ bash tests/commit-message.sh
 ```
 
 GitHub Actions runs ShellCheck, shfmt, Markdownlint, secret scanning, commit
-message validation, coverage, and the complete install/uninstall lifecycle on
-Ubuntu and macOS. The lifecycle and architecture tests use isolated temporary
-home and state directories; they never modify the runner's real user
-configuration.
+message validation, and the complete install/uninstall lifecycle on Ubuntu and
+macOS. The lifecycle and architecture tests use isolated temporary home and
+state directories; they never modify the runner's real user configuration.
 
 These are contributor and CI tools. Running the installer itself needs bash and
 git and nothing else. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow

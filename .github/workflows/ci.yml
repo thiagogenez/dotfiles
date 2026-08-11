@@ -116,30 +116,3 @@ jobs:
           else
             /bin/bash tests/architecture.sh
           fi
-
-  coverage:
-    name: Coverage
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-
-      - name: Install kcov
-        run: sudo apt-get update && sudo apt-get install -y kcov
-
-      - name: Run the suites under kcov
-        # kcov instruments the interpreter, so lib/dotfiles.sh is measured even
-        # though the tests reach it through install.sh.
-        run: |
-          kcov --include-path=lib,install.sh,update.sh,uninstall.sh \
-            coverage tests/install-uninstall.sh
-          kcov --include-path=lib,install.sh,update.sh,uninstall.sh \
-            coverage tests/architecture.sh
-
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          directory: coverage
-          fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
