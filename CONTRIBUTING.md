@@ -63,6 +63,23 @@ machine; both are single binaries with no dependency tree.
 overlap. These are contributor and CI tools only. Running the installer needs
 bash and git, nothing more, and that must stay true.
 
+## Optional tooling
+
+Two conventions here are easier to follow with help. Commit messages take a
+terse Conventional Commits form, and issue and pull request text should read as
+written rather than generated. If you use a coding agent, these produce both:
+
+```bash
+npx skills add JuliusBrussee/caveman -a <agent>   # commit messages
+npx skills add blader/humanizer -a <agent>        # issue and pull request prose
+```
+
+`<agent>` is `claude`, `codex`, `cursor`, and so on.
+
+Both install third-party code from GitHub, so read what you are installing.
+Neither is expected of you. The conventions are written out in this file and in
+[AGENTS.md](AGENTS.md), and work written by hand is judged the same way.
+
 The lifecycle test builds temporary home and state directories and never touches
 your real configuration. It also points `DOTFILES_PRIVATE_ROOT` at a path that
 does not exist, so a private overlay sitting next to the checkout cannot leak
