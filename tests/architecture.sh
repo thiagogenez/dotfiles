@@ -76,10 +76,10 @@ check() {
     assert_links_target_prefix "$1"
 }
 
-mkdir -p "$home" "$overlay/gnupg" "$overlay/git" "$overlay/ssh"
-printf '%s\n' "pinentry-program /example/pinentry" >"$overlay/gnupg/gpg-agent.conf"
-printf '[user]\n\tname = Example\n' >"$overlay/git/config"
-printf 'Host example\n    User example\n' >"$overlay/ssh/config"
+mkdir -p "$home" "$overlay/config/gnupg" "$overlay/config/git" "$overlay/config/ssh"
+printf '%s\n' "pinentry-program /example/pinentry" >"$overlay/config/gnupg/gpg-agent.conf"
+printf '[user]\n\tname = Example\n' >"$overlay/config/git/config"
+printf 'Host example\n    User example\n' >"$overlay/config/ssh/config"
 
 run "$repo/install.sh" --all >/dev/null
 check "install"
@@ -89,13 +89,13 @@ check "update"
 
 # A link deliberately pointed back at the checkout must be repaired, not kept.
 rm "$home/.ssh/config"
-ln -s "$repo/ssh/config" "$home/.ssh/config"
+ln -s "$repo/config/ssh/config" "$home/.ssh/config"
 run "$repo/update.sh" >/dev/null
 check "update over a link into the checkout"
 
 # Reinstalling over the previous scheme must not leave a checkout link behind.
 rm "$home/.config/git"
-ln -s "$repo/git" "$home/.config/git"
+ln -s "$repo/config/git" "$home/.config/git"
 run "$repo/install.sh" --all >/dev/null
 check "reinstall over a link into the checkout"
 

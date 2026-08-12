@@ -30,9 +30,9 @@ dotfiles_component_description() {
 # so it may live in a directory that macOS gates behind a privacy prompt.
 dotfiles_component_origin() {
     case "$1" in
-        git)   printf '%s' "$DOTFILES_REPO/git" ;;
-        ssh)   printf '%s' "$DOTFILES_REPO/ssh/config" ;;
-        gnupg) printf '%s' "$DOTFILES_PRIVATE_REPO/gnupg/gpg-agent.conf" ;;
+        git)   printf '%s' "$DOTFILES_REPO/config/git" ;;
+        ssh)   printf '%s' "$DOTFILES_REPO/config/ssh/config" ;;
+        gnupg) printf '%s' "$DOTFILES_PRIVATE_REPO/config/gnupg/gpg-agent.conf" ;;
     esac
 }
 
@@ -431,18 +431,29 @@ $listing
 EOF
 }
 
+# Publish every directory under a checkout's config/ into the matching prefix.
+# Iterating means a new component needs no edit here, and it keeps the boundary
+# honest: config/ is payload, everything else in the checkout is not.
+dotfiles_sync_config() {
+    local source="$1" dest="$2" entry
+
+    [ -d "$source" ] || return 0
+
+    for entry in "$source"/*; do
+        [ -d "$entry" ] || continue
+        dotfiles_sync_tree "$entry" "$dest/$(basename "$entry")"
+    done
+}
+
 # Publish both checkouts into their prefixes. The private overlay is optional;
 # the Git and SSH includes that reference it degrade to no-ops when it is absent.
 dotfiles_sync_payload() {
     DOTFILES_SYNC_CHANGED=0
 
-    dotfiles_sync_tree "$DOTFILES_REPO/git" "$DOTFILES_PREFIX/git"
-    dotfiles_sync_tree "$DOTFILES_REPO/ssh" "$DOTFILES_PREFIX/ssh"
+    dotfiles_sync_config "$DOTFILES_REPO/config" "$DOTFILES_PREFIX"
 
     if [ -d "$DOTFILES_PRIVATE_REPO" ]; then
-        dotfiles_sync_tree "$DOTFILES_PRIVATE_REPO/git" "$DOTFILES_PRIVATE_PREFIX/git"
-        dotfiles_sync_tree "$DOTFILES_PRIVATE_REPO/ssh" "$DOTFILES_PRIVATE_PREFIX/ssh"
-        dotfiles_sync_tree "$DOTFILES_PRIVATE_REPO/gnupg" "$DOTFILES_PRIVATE_PREFIX/gnupg"
+        dotfiles_sync_config "$DOTFILES_PRIVATE_REPO/config" "$DOTFILES_PRIVATE_PREFIX"
     fi
 
     if [ "$DOTFILES_SYNC_CHANGED" -eq 0 ]; then

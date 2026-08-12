@@ -20,10 +20,11 @@ local overlay.
 ## Layout
 
 ```text
-git/config     \
-git/ignore      > ~/.local/share/dotfiles/git <- ~/.config/git
-ssh/config     -> ~/.local/share/dotfiles/ssh/config <- ~/.ssh/config
-gnupg/            documents the optional private GnuPG component
+config/           everything here is published, nothing else is
+  git/config   \
+  git/ignore    > ~/.local/share/dotfiles/git <- ~/.config/git
+  ssh/config   -> ~/.local/share/dotfiles/ssh/config <- ~/.ssh/config
+lib/              the installer itself
 install.sh        publishes the checkout and links selected components
 update.sh         republishes the checkout after editing it
 uninstall.sh      removes selected components and restores prior configuration
@@ -118,12 +119,13 @@ Optional machine-specific configuration lives in a second checkout, by default a
 
 ```text
 dotfiles-private/
-├── git/
-│   └── config
-├── gnupg/
-│   └── gpg-agent.conf
-└── ssh/
-    └── config
+└── config/
+    ├── git/
+    │   └── config
+    ├── gnupg/
+    │   └── gpg-agent.conf
+    └── ssh/
+        └── config
 ```
 
 Set `DOTFILES_PRIVATE_ROOT` to keep it somewhere else. It is published alongside

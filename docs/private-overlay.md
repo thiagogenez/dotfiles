@@ -17,6 +17,20 @@ gh repo clone YOUR_GITHUB_USER/dotfiles-private "$(dirname "$public")/dotfiles-p
 
 Set `DOTFILES_PRIVATE_ROOT` if you keep it elsewhere.
 
+Everything the installer publishes lives under `config/`, matching the public
+repository:
+
+```text
+dotfiles-private/
+└── config/
+    ├── git/
+    ├── gnupg/
+    └── ssh/
+```
+
+Anything outside `config/` is yours to use for notes or scripts and is never
+published.
+
 Two paths matter throughout this document and they are not the same:
 
 - The **checkout**, where you create and commit these files.
@@ -28,7 +42,7 @@ Never point an include at the checkout. Publishing exists so that nothing under
 
 ## 2. Add private Git routing
 
-Create `git/config` in the private checkout:
+Create `config/git/config` in the private checkout:
 
 ```gitconfig
 [user]
@@ -50,7 +64,7 @@ your working directories. Only `path` values move to the published location.
 
 ## 3. Add identities and signing
 
-For SSH signing, create `git/personal` in the private checkout:
+For SSH signing, create `config/git/personal` in the private checkout:
 
 ```gitconfig
 [user]
@@ -60,7 +74,7 @@ For SSH signing, create `git/personal` in the private checkout:
     format = ssh
 ```
 
-For OpenPGP signing, create `git/work` in the private checkout:
+For OpenPGP signing, create `config/git/work` in the private checkout:
 
 ```gitconfig
 [user]
@@ -71,7 +85,7 @@ For OpenPGP signing, create `git/work` in the private checkout:
 ```
 
 The public configuration enables signed commits. If you do not want signing, override
-it in the private `git/config`:
+it in the private `config/git/config`:
 
 ```gitconfig
 [commit]
@@ -84,7 +98,7 @@ remain in an SSH agent, credential manager, or local keyring.
 
 ## 4. Add optional SSH defaults
 
-Create `ssh/config` in the private checkout only when private host or user settings
+Create `config/ssh/config` in the private checkout only when private host or user
 are needed:
 
 ```sshconfig
@@ -99,8 +113,8 @@ because SSH keeps the first value it finds for each keyword.
 ## 5. Add optional GnuPG agent configuration
 
 GnuPG does not support an SSH-style include in `gpg-agent.conf`. To manage it
-through the private overlay, create `gnupg/gpg-agent.conf` in the private checkout
-with the agent options needed on your machine. For example:
+through the private overlay, create `config/gnupg/gpg-agent.conf` in the private
+checkout with the agent options needed on your machine. For example:
 
 ```text
 pinentry-program /absolute/path/to/your/pinentry
@@ -110,10 +124,15 @@ Then run `./install.sh` and select GnuPG. The installer publishes the file and l
 `~/.gnupg/gpg-agent.conf` at the published copy; it does not install GnuPG, pinentry,
 private keys, or credentials. `./update.sh` restarts the agent when this file changes.
 
+This is the one component whose link names a private file directly. Every other
+one reaches its file through an include in a public configuration file, which
+`gpg-agent.conf` has no directive for.
+
 ## 6. Add optional private ignore rules
 
-Create `git/ignore` in the private checkout for patterns that should not appear
-in the public repository, then select it from the private `git/config`:
+Create `config/git/ignore` in the private checkout for patterns that should not
+appear in the public repository, then select it from the private
+`config/git/config`:
 
 ```gitconfig
 [core]
