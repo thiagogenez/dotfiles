@@ -71,9 +71,9 @@ assert_link "$fresh_home/.ssh/config" "$fresh_prefix/ssh/config"
 assert_absent "$fresh_home/.gnupg/gpg-agent.conf"
 assert_no_link_into_source "$fresh_home"
 
-assert_same "$fresh_prefix/git/config" "$repo/git/config"
-assert_same "$fresh_prefix/git/ignore" "$repo/git/ignore"
-assert_same "$fresh_prefix/ssh/config" "$repo/ssh/config"
+assert_same "$fresh_prefix/git/config" "$repo/config/git/config"
+assert_same "$fresh_prefix/git/ignore" "$repo/config/git/ignore"
+assert_same "$fresh_prefix/ssh/config" "$repo/config/ssh/config"
 
 # A second installation must leave links intact without creating another backup.
 HOME="$fresh_home" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
@@ -97,7 +97,7 @@ fi
 
 HOME="$fresh_home" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/update.sh" >/dev/null
-assert_same "$fresh_prefix/git/config" "$repo/git/config"
+assert_same "$fresh_prefix/git/config" "$repo/config/git/config"
 
 HOME="$fresh_home" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/update.sh" --check >/dev/null ||
@@ -171,8 +171,8 @@ legacy_home="$test_root/legacy-home"
 legacy_state="$test_root/legacy-state"
 legacy_prefix="$legacy_home/.local/share/dotfiles"
 mkdir -p "$legacy_home/.config" "$legacy_home/.ssh"
-ln -s "$repo/git" "$legacy_home/.config/git"
-ln -s "$repo/ssh/config" "$legacy_home/.ssh/config"
+ln -s "$repo/config/git" "$legacy_home/.config/git"
+ln -s "$repo/config/ssh/config" "$legacy_home/.ssh/config"
 
 HOME="$legacy_home" XDG_STATE_HOME="$legacy_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/install.sh" git ssh
@@ -188,23 +188,23 @@ private_home="$test_root/private-home"
 private_state="$test_root/private-state"
 private_root="$test_root/private-overlay"
 private_prefix="$private_home/.local/share/dotfiles-private"
-mkdir -p "$private_home" "$private_root/gnupg"
-printf '%s\n' "pinentry-program /example/pinentry" >"$private_root/gnupg/gpg-agent.conf"
+mkdir -p "$private_home" "$private_root/config/gnupg"
+printf '%s\n' "pinentry-program /example/pinentry" >"$private_root/config/gnupg/gpg-agent.conf"
 
 HOME="$private_home" XDG_STATE_HOME="$private_state" DOTFILES_PRIVATE_ROOT="$private_root" \
     "$repo/install.sh" gnupg
 assert_link "$private_home/.gnupg/gpg-agent.conf" "$private_prefix/gnupg/gpg-agent.conf"
-assert_same "$private_prefix/gnupg/gpg-agent.conf" "$private_root/gnupg/gpg-agent.conf"
+assert_same "$private_prefix/gnupg/gpg-agent.conf" "$private_root/config/gnupg/gpg-agent.conf"
 
 # The overlay is published from its own checkout, never linked to it.
 case "$(readlink "$private_home/.gnupg/gpg-agent.conf")" in
     "$private_root"/*) fail "gnupg link resolves into the overlay checkout" ;;
 esac
 
-printf '%s\n' "pinentry-program /example/updated" >"$private_root/gnupg/gpg-agent.conf"
+printf '%s\n' "pinentry-program /example/updated" >"$private_root/config/gnupg/gpg-agent.conf"
 HOME="$private_home" XDG_STATE_HOME="$private_state" DOTFILES_PRIVATE_ROOT="$private_root" \
     "$repo/update.sh" >/dev/null
-assert_same "$private_prefix/gnupg/gpg-agent.conf" "$private_root/gnupg/gpg-agent.conf"
+assert_same "$private_prefix/gnupg/gpg-agent.conf" "$private_root/config/gnupg/gpg-agent.conf"
 
 HOME="$private_home" XDG_STATE_HOME="$private_state" DOTFILES_PRIVATE_ROOT="$private_root" \
     "$repo/uninstall.sh" gnupg
