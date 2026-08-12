@@ -128,15 +128,49 @@ bash tests/commit-message.sh
 ```
 
 `shellcheck` covers correctness and `shfmt` covers layout; they do not overlap.
-Install both with your package manager, for example `brew install shellcheck
-shfmt`. Neither is required to contribute: CI runs the same commands, and
-skipping them locally only costs a round trip.
+Neither is required to contribute: CI runs the same commands, and skipping them
+locally only costs a round trip.
 
 Nothing in this pipeline may become a runtime dependency of the installer.
 `install.sh` runs with bash and git alone, and it has to stay that way, because
 it manages SSH and GnuPG configuration on machines that may have nothing else
 installed. Tools belong in CI and on contributor machines, never in the
 installer's execution path.
+
+## Tooling
+
+All optional. The rules in this file are written out in full and CI is what
+decides, so a clone needs nothing beyond bash and git. These only shorten the
+loop.
+
+| Tool | What it does here |
+| --- | --- |
+| shellcheck | correctness of shell |
+| shfmt | layout of shell |
+| caveman | writes commit messages in the form above |
+| humanizer | strips generated-text tells from issue and pull request prose |
+
+```bash
+brew install shellcheck shfmt
+
+# <agent> is claude, codex, cursor, and so on
+npx skills add JuliusBrussee/caveman -a <agent>
+npx skills add blader/humanizer -a <agent>
+```
+
+The same installer serves each agent, so a tool added once behaves the same
+whichever one is running.
+
+These are suggestions, not requirements, and the last two install third-party
+code from GitHub. Read what you are installing, and skip them freely: a pull
+request written by hand and a pull request written with them are judged the
+same way.
+
+Should this repository ever ship a skill of its own, the content belongs in
+`.agents/skills/<name>/SKILL.md`, with `.claude/skills/<name>` and
+`.codex/skills/<name>` as relative symlinks to it. One copy, one symlink per
+agent, so editing the skill reaches every agent at once. Git stores those
+symlinks natively, so a clone needs no setup step.
 
 The lifecycle test uses temporary home and state directories and never touches
 real user configuration. It also sets `DOTFILES_PRIVATE_ROOT` to a path that
