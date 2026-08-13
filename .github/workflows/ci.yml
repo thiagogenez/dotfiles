@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Run ShellCheck
-        run: shellcheck -x install.sh update.sh uninstall.sh lib/dotfiles.sh tests/*.sh
+        run: shellcheck -x install.sh update.sh uninstall.sh doctor.sh lib/dotfiles.sh tests/*.sh
 
       - name: Install shfmt
         run: |
@@ -39,7 +39,7 @@ jobs:
           chmod +x /tmp/shfmt
 
       - name: Check formatting
-        run: /tmp/shfmt -d -i 4 -ci -kp install.sh update.sh uninstall.sh lib/dotfiles.sh tests/*.sh
+        run: /tmp/shfmt -d -i 4 -ci -kp install.sh update.sh uninstall.sh doctor.sh lib/dotfiles.sh tests/*.sh
 
       - name: Run Markdownlint
         uses: DavidAnson/markdownlint-cli2-action@v24

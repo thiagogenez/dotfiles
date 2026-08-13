@@ -356,6 +356,16 @@ Components:
   ssh    SSH configuration with a private overlay
   gnupg  GnuPG agent configuration from the private overlay
 EOF
+    elif [ "$action" = "doctor" ]; then
+        cat <<'EOF'
+Usage: ./doctor.sh
+
+Checks this machine's installation and reports what it finds. Read-only: it
+never repairs anything. Exits non-zero when something is wrong, so it can gate
+a shell prompt or a scheduled job.
+
+Run ./update.sh to repair links and republish the checkout.
+EOF
     elif [ "$action" = "update" ]; then
         cat <<'EOF'
 Usage: ./update.sh [--check]
@@ -379,8 +389,50 @@ EOF
 # Mirror one payload directory from the source checkout into the install prefix.
 # Reports every file it would touch and leaves matching files alone, so a repeat
 # run is silent. With DOTFILES_DRY_RUN=1 nothing is written.
+# Digest of a published file, recorded so a later run can tell which side of a
+# difference moved. Without it the installer sees only "these differ" and always
+# assumes the checkout is the one that changed.
+dotfiles_digest() {
+    [ -f "$1" ] || return 0
+    if command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | cut -d' ' -f1
+    else
+        sha256sum "$1" | cut -d' ' -f1
+    fi
+}
+
+dotfiles_manifest_path() {
+    printf '%s' "$DOTFILES_MANIFEST_ROOT/$(printf '%s' "$1" | tr '/' '%')"
+}
+
+dotfiles_manifest_read() {
+    local record
+    record="$(dotfiles_manifest_path "$1")"
+    [ -f "$record" ] && cat "$record"
+}
+
+dotfiles_manifest_write() {
+    local record
+    record="$(dotfiles_manifest_path "$1")"
+    mkdir -p "$DOTFILES_MANIFEST_ROOT"
+    dotfiles_digest "$1" >"$record"
+}
+
+# Move a file the installer is about to overwrite into the backup store, keeping
+# the path it had under the prefix so it can be found again.
+dotfiles_preserve_local_edit() {
+    local target="$1" relative backup
+
+    relative="${target#"$DOTFILES_DATA_HOME"/}"
+    backup="$DOTFILES_BACKUP_ROOT/local/$relative"
+
+    mkdir -p "$(dirname "$backup")"
+    cp "$target" "$backup"
+    echo "  preserved a local edit to $target at $backup"
+}
+
 dotfiles_sync_tree() {
-    local source="$1" dest="$2" relative file target listing
+    local source="$1" dest="$2" relative file target listing published
 
     [ -d "$source" ] || return 0
 
@@ -398,6 +450,20 @@ dotfiles_sync_tree() {
             continue
         fi
 
+        # The installed copy differs from the checkout. Compare both against what
+        # was published last to find out which one moved.
+        if [ -f "$target" ]; then
+            published="$(dotfiles_manifest_read "$target")"
+            if [ -n "$published" ] && [ "$published" != "$(dotfiles_digest "$target")" ]; then
+                DOTFILES_LOCAL_EDITS=1
+                if [ "$DOTFILES_DRY_RUN" -eq 1 ]; then
+                    echo "  would overwrite a local edit to $target"
+                else
+                    dotfiles_preserve_local_edit "$target"
+                fi
+            fi
+        fi
+
         DOTFILES_SYNC_CHANGED=1
         if [ "$DOTFILES_DRY_RUN" -eq 1 ]; then
             echo "  would update $target"
@@ -406,6 +472,7 @@ dotfiles_sync_tree() {
 
         mkdir -p "$(dirname "$target")"
         cp "$file" "$target"
+        dotfiles_manifest_write "$target"
         echo "  updated $target"
     done <<EOF
 $listing
@@ -424,7 +491,7 @@ EOF
             continue
         fi
 
-        rm -f "$target"
+        rm -f "$target" "$(dotfiles_manifest_path "$target")"
         echo "  removed $target"
     done <<EOF
 $listing
@@ -445,19 +512,49 @@ dotfiles_sync_config() {
     done
 }
 
+# A checkout that exists but has no config/ publishes nothing. Silence there
+# reads as "up to date" when it means "this overlay is being ignored", so the
+# absent case and the empty case are reported differently.
+dotfiles_check_config_dir() {
+    local checkout="$1" label="$2"
+
+    [ -d "$checkout" ] || return 0
+
+    if [ ! -d "$checkout/config" ]; then
+        echo "Warning: $label at $checkout has no config/ directory." >&2
+        echo "         Nothing from it will be published. Payload belongs in" >&2
+        echo "         $checkout/config/{git,ssh,gnupg}." >&2
+        return 0
+    fi
+
+    case "$(echo "$checkout"/config/*/)" in
+        *'/config/*/') echo "Warning: $checkout/config is empty, so nothing will be published." >&2 ;;
+    esac
+}
+
 # Publish both checkouts into their prefixes. The private overlay is optional;
 # the Git and SSH includes that reference it degrade to no-ops when it is absent.
 dotfiles_sync_payload() {
     DOTFILES_SYNC_CHANGED=0
+    DOTFILES_LOCAL_EDITS=0
+
+    dotfiles_check_config_dir "$DOTFILES_REPO" "the checkout"
+    dotfiles_check_config_dir "$DOTFILES_PRIVATE_REPO" "the private overlay"
 
     dotfiles_sync_config "$DOTFILES_REPO/config" "$DOTFILES_PREFIX"
-
-    if [ -d "$DOTFILES_PRIVATE_REPO" ]; then
-        dotfiles_sync_config "$DOTFILES_PRIVATE_REPO/config" "$DOTFILES_PRIVATE_PREFIX"
-    fi
+    dotfiles_sync_config "$DOTFILES_PRIVATE_REPO/config" "$DOTFILES_PRIVATE_PREFIX"
 
     if [ "$DOTFILES_SYNC_CHANGED" -eq 0 ]; then
         echo "  installed copy already matches the source checkout"
+    fi
+
+    if [ "$DOTFILES_LOCAL_EDITS" -eq 1 ]; then
+        echo
+        echo "The installed copy carried edits that were not made in the checkout," >&2
+        echo "so they have been copied into $DOTFILES_BACKUP_ROOT/local before" >&2
+        echo "being replaced. This happens when a tool writes through a link, as" >&2
+        echo "'git config --global' does. Move anything worth keeping into the" >&2
+        echo "checkout, where it is version-controlled." >&2
     fi
 }
 
@@ -552,6 +649,12 @@ dotfiles_cleanup_state() {
     if [ "$remaining" -eq 0 ]; then
         dotfiles_remove_prefix "$DOTFILES_PREFIX"
         dotfiles_remove_prefix "$DOTFILES_PRIVATE_PREFIX"
+    fi
+
+    # The manifest only describes files that were published; once the prefix is
+    # gone it describes nothing. Preserved local edits are not touched.
+    if [ "$remaining" -eq 0 ] && [ -d "$DOTFILES_MANIFEST_ROOT" ]; then
+        rm -rf -- "$DOTFILES_MANIFEST_ROOT"
     fi
 
     rmdir "$DOTFILES_BACKUP_ROOT/.config" 2>/dev/null || true
@@ -693,14 +796,193 @@ dotfiles_update() {
     echo "Done. The installed copy matches the source checkout."
 }
 
+DOTFILES_DOCTOR_FAILED=0
+
+dotfiles_report() {
+    local status="$1" message="$2"
+    case "$status" in
+        ok) printf '  ok    %s\n' "$message" ;;
+        warn) printf '  warn  %s\n' "$message" ;;
+        bad)
+            printf '  FAIL  %s\n' "$message"
+            DOTFILES_DOCTOR_FAILED=1
+            ;;
+    esac
+}
+
+# Does every installed component still point where it should?
+dotfiles_doctor_links() {
+    local id source target link
+
+    for id in "${DOTFILES_COMPONENT_IDS[@]}"; do
+        [ -e "$DOTFILES_COMPONENTS_ROOT/$id" ] || continue
+
+        source="$(dotfiles_component_source "$id")"
+        target="$HOME/$(dotfiles_component_target "$id")"
+
+        if [ ! -L "$target" ]; then
+            if [ -e "$target" ]; then
+                dotfiles_report bad "$target is not a link. Something replaced it."
+            else
+                dotfiles_report bad "$target is missing. Run ./update.sh to restore it."
+            fi
+            continue
+        fi
+
+        link="$(readlink "$target")"
+        if [ "$link" = "$source" ]; then
+            dotfiles_report ok "$target"
+        else
+            dotfiles_report bad "$target points at $link, expected $source"
+        fi
+    done
+}
+
+# The rule the design rests on: nothing in $HOME may resolve into a checkout.
+dotfiles_doctor_boundary() {
+    local link target found=0 listing
+
+    # A missing directory makes find exit non-zero, which under set -e would
+    # abort the whole check rather than skip one path.
+    listing="$(find "$HOME/.config" "$HOME/.ssh" "$HOME/.gnupg" "$DOTFILES_DATA_HOME" \
+        -type l 2>/dev/null || true)"
+    while IFS= read -r link; do
+        [ -n "$link" ] || continue
+        target="$(readlink "$link")"
+        case "$target" in
+            "$DOTFILES_REPO" | "$DOTFILES_REPO"/* | "$DOTFILES_PRIVATE_REPO" | "$DOTFILES_PRIVATE_REPO"/*)
+                found=1
+                dotfiles_report bad "$link resolves into a checkout at $target"
+                ;;
+        esac
+    done <<EOF
+$listing
+EOF
+
+    if [ "$found" -eq 0 ]; then
+        dotfiles_report ok "nothing under \$HOME resolves into a checkout"
+    fi
+}
+
+# Edits written straight into the prefix, which the next update would replace.
+dotfiles_doctor_local_edits() {
+    local record path digest found=0
+
+    if [ ! -d "$DOTFILES_MANIFEST_ROOT" ]; then
+        dotfiles_report warn "no record of what was published; run ./update.sh"
+        return
+    fi
+
+    for record in "$DOTFILES_MANIFEST_ROOT"/*; do
+        [ -f "$record" ] || continue
+        path="$(basename "$record" | tr '%' '/')"
+        [ -f "$path" ] || continue
+
+        digest="$(dotfiles_digest "$path")"
+        if [ "$digest" != "$(cat "$record")" ]; then
+            found=1
+            dotfiles_report warn "$path was edited in place; ./update.sh will replace it"
+        fi
+    done
+
+    if [ "$found" -eq 0 ]; then
+        dotfiles_report ok "no edits made directly to the installed copy"
+    fi
+}
+
+dotfiles_doctor_payload() {
+    local checkout label
+
+    for checkout in "$DOTFILES_REPO:the checkout" "$DOTFILES_PRIVATE_REPO:the private overlay"; do
+        label="${checkout#*:}"
+        checkout="${checkout%%:*}"
+
+        if [ ! -d "$checkout" ]; then
+            if [ "$label" = "the checkout" ]; then
+                dotfiles_report bad "$label is missing at $checkout"
+            fi
+            continue
+        fi
+
+        if [ ! -d "$checkout/config" ]; then
+            dotfiles_report bad "$label has no config/, so nothing from it is published"
+            continue
+        fi
+
+        dotfiles_report ok "$label publishes from $checkout/config"
+    done
+}
+
+# Ask Git and SSH what they resolve to, rather than trusting the files to parse.
+dotfiles_doctor_resolution() {
+    if command -v git >/dev/null 2>&1; then
+        if git config --get user.name >/dev/null 2>&1; then
+            dotfiles_report ok "git resolves a user identity"
+        else
+            dotfiles_report warn "git resolves no user.name; the overlay may not be published"
+        fi
+    fi
+
+    if command -v ssh >/dev/null 2>&1; then
+        if ssh -G github.com >/dev/null 2>&1; then
+            dotfiles_report ok "ssh parses its configuration"
+        else
+            dotfiles_report bad "ssh cannot parse its configuration"
+        fi
+    fi
+}
+
+# Read-only by design. Diagnosing and repairing in one command is a command
+# nobody trusts to run when something already looks wrong.
+dotfiles_doctor() {
+    local installed=0 id
+
+    for id in "${DOTFILES_COMPONENT_IDS[@]}"; do
+        [ -e "$DOTFILES_COMPONENTS_ROOT/$id" ] && installed=1
+    done
+
+    if [ "$installed" -eq 0 ]; then
+        echo "Nothing is installed. Run ./install.sh first."
+        return
+    fi
+
+    echo "Checkout:  $DOTFILES_REPO"
+    echo "Installed: $DOTFILES_PREFIX"
+    echo
+
+    echo "Payload"
+    dotfiles_doctor_payload
+    echo
+    echo "Links"
+    dotfiles_doctor_links
+    echo
+    echo "Boundary"
+    dotfiles_doctor_boundary
+    echo
+    echo "Local edits"
+    dotfiles_doctor_local_edits
+    echo
+    echo "Resolution"
+    dotfiles_doctor_resolution
+    echo
+
+    if [ "$DOTFILES_DOCTOR_FAILED" -eq 1 ]; then
+        echo "Something is wrong above. ./update.sh repairs links and republishes;"
+        echo "anything it does not fix needs a look by hand."
+        return 1
+    fi
+
+    echo "This installation looks healthy."
+}
+
 dotfiles_main() {
     local action="${1:-}" repo="${2:-}"
     shift 2 || true
 
     case "$action" in
-        install | uninstall | update) ;;
+        install | uninstall | update | doctor) ;;
         *)
-            echo "Internal error: expected install or uninstall" >&2
+            echo "Internal error: unknown action" >&2
             return 2
             ;;
     esac
@@ -718,11 +1000,13 @@ dotfiles_main() {
     DOTFILES_STATE_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles-installer"
     DOTFILES_BACKUP_ROOT="$DOTFILES_STATE_ROOT/backups"
     DOTFILES_COMPONENTS_ROOT="$DOTFILES_STATE_ROOT/components"
+    DOTFILES_MANIFEST_ROOT="$DOTFILES_STATE_ROOT/published"
     DOTFILES_DRY_RUN=0
     DOTFILES_SYNC_CHANGED=0
+    DOTFILES_LOCAL_EDITS=0
     export DOTFILES_REPO DOTFILES_PRIVATE_REPO DOTFILES_DATA_HOME DOTFILES_PREFIX \
         DOTFILES_PRIVATE_PREFIX DOTFILES_STATE_ROOT DOTFILES_BACKUP_ROOT \
-        DOTFILES_COMPONENTS_ROOT
+        DOTFILES_COMPONENTS_ROOT DOTFILES_MANIFEST_ROOT
 
     if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
         dotfiles_usage "$action"
@@ -743,6 +1027,11 @@ dotfiles_main() {
         return
     fi
 
+    if [ "$action" = "doctor" ]; then
+        dotfiles_doctor
+        return
+    fi
+
     dotfiles_choose_components "$action" "$@"
     dotfiles_print_selection "$action"
     if [ "$DOTFILES_SELECTED_COUNT" -eq 0 ]; then
@@ -757,6 +1046,12 @@ dotfiles_main() {
         echo "  git config --global --list --show-origin"
     else
         echo "Done. The pre-install configuration has been restored."
+        if [ -d "$DOTFILES_BACKUP_ROOT/local" ]; then
+            echo
+            echo "Edits made to the installed copy were preserved earlier and are"
+            echo "still at $DOTFILES_BACKUP_ROOT/local. They are yours to keep or"
+            echo "delete; uninstall does not remove them."
+        fi
     fi
 }
 

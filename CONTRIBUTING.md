@@ -47,12 +47,15 @@ Target Bash 3.2, which is what macOS ships. Associative arrays, `mapfile`, and
 ## Running the checks
 
 ```bash
-shellcheck -x install.sh update.sh uninstall.sh lib/dotfiles.sh tests/*.sh
-shfmt -d -i 4 -ci -kp install.sh update.sh uninstall.sh lib/dotfiles.sh tests/*.sh
+shellcheck -x install.sh update.sh uninstall.sh doctor.sh lib/dotfiles.sh tests/*.sh
+shfmt -d -i 4 -ci -kp install.sh update.sh uninstall.sh doctor.sh lib/dotfiles.sh tests/*.sh
 bash tests/install-uninstall.sh
 bash tests/architecture.sh
 bash tests/commit-message.sh
 ```
+
+`./doctor.sh` reports whether the current machine's installation is healthy. It
+is read-only and never repairs; `./update.sh` does that.
 
 None of this is required to contribute. CI runs the same commands, so skipping
 them locally costs you a round trip and nothing else. If you do want them,
