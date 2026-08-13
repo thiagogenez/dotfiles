@@ -120,8 +120,8 @@ run.
 Run these before opening a pull request:
 
 ```bash
-shellcheck -x install.sh update.sh uninstall.sh doctor.sh lib/dotfiles.sh tests/*.sh
-shfmt -d -i 4 -ci -kp install.sh update.sh uninstall.sh doctor.sh lib/dotfiles.sh tests/*.sh
+shellcheck -x ./*.sh lib/*.sh tests/*.sh
+shfmt -d -i 4 -ci -kp ./*.sh lib/*.sh tests/*.sh
 bash tests/install-uninstall.sh
 bash tests/architecture.sh
 bash tests/commit-message.sh
