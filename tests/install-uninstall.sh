@@ -122,11 +122,66 @@ HOME="$fresh_home" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_priv
 assert_absent "$fresh_home/.config/git"
 assert_absent "$fresh_home/.ssh/config"
 assert_absent "$fresh_prefix"
-[ ! -d "$fresh_state/dotfiles-installer" ] || fail "fresh install state was not removed"
+
+# The local edit made above was preserved, and uninstall must not delete it:
+# it is the user's data, not the installer's. Everything else goes.
+[ -f "$fresh_state/dotfiles-installer/backups/local/dotfiles/git/config" ] ||
+    fail "a preserved local edit was removed by uninstall"
+grep -Fq "hand-edited installed copy" \
+    "$fresh_state/dotfiles-installer/backups/local/dotfiles/git/config" ||
+    fail "the preserved local edit does not contain what was edited"
+[ ! -d "$fresh_state/dotfiles-installer/published" ] ||
+    fail "the published manifest outlived the prefix it describes"
+[ ! -d "$fresh_state/dotfiles-installer/components" ] ||
+    fail "component markers were not removed"
 
 # Update on an empty installation is a no-op, not an error.
 HOME="$fresh_home" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/update.sh" >/dev/null || fail "update failed with nothing installed"
+
+# --- an edit to the installed copy is detected and preserved -----------------
+
+# The installer must tell a local edit apart from a stale checkout. Both look
+# like "these two files differ"; only the manifest says which side moved.
+local_home="$test_root/local-home"
+local_state="$test_root/local-state"
+local_prefix="$local_home/.local/share/dotfiles"
+mkdir -p "$local_home"
+
+run_local() {
+    # --check exits non-zero by design, so capture rather than pipe: under
+    # pipefail the exit status would mask a successful grep.
+    HOME="$local_home" XDG_STATE_HOME="$local_state" \
+        DOTFILES_PRIVATE_ROOT="$no_private" "$@" 2>&1 || true
+}
+
+run_local "$repo/install.sh" git ssh >/dev/null
+
+# Simulates `git config --global`, which writes through the link into the prefix.
+printf '%s\n' "written by a tool through the link" >>"$local_prefix/git/config"
+
+case "$(run_local "$repo/update.sh" --check)" in
+    *"would overwrite a local edit"*) ;;
+    *) fail "--check did not announce that a local edit would be overwritten" ;;
+esac
+
+grep -Fq "written by a tool through the link" "$local_prefix/git/config" ||
+    fail "--check modified the installed copy"
+
+case "$(run_local "$repo/update.sh")" in
+    *"preserved a local edit"*) ;;
+    *) fail "update did not report preserving the local edit" ;;
+esac
+
+assert_same "$local_prefix/git/config" "$repo/config/git/config"
+grep -Fq "written by a tool through the link" \
+    "$local_state/dotfiles-installer/backups/local/dotfiles/git/config" ||
+    fail "the local edit was not preserved with its contents"
+
+# A second run has nothing left to preserve and must be quiet about it.
+case "$(run_local "$repo/update.sh")" in
+    *"preserved a local edit"*) fail "update reported a preserved edit when none existed" ;;
+esac
 
 # --- pre-existing configuration is preserved ---------------------------------
 
@@ -210,6 +265,98 @@ HOME="$private_home" XDG_STATE_HOME="$private_state" DOTFILES_PRIVATE_ROOT="$pri
     "$repo/uninstall.sh" gnupg
 assert_absent "$private_home/.gnupg/gpg-agent.conf"
 assert_absent "$private_prefix"
+
+# --- doctor reports the state of a real installation -------------------------
+
+doc_home="$test_root/doctor-home"
+doc_state="$test_root/doctor-state"
+doc_prefix="$doc_home/.local/share/dotfiles"
+mkdir -p "$doc_home"
+
+run_doc() {
+    HOME="$doc_home" XDG_STATE_HOME="$doc_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+        "$@" 2>&1 || true
+}
+
+doc_status() {
+    HOME="$doc_home" XDG_STATE_HOME="$doc_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+        "$repo/doctor.sh" >/dev/null 2>&1
+    echo "$?"
+}
+
+case "$(run_doc "$repo/doctor.sh")" in
+    *"Nothing is installed"*) ;;
+    *) fail "doctor did not report an empty installation" ;;
+esac
+
+run_doc "$repo/install.sh" git ssh >/dev/null
+case "$(run_doc "$repo/doctor.sh")" in
+    *"looks healthy"*) ;;
+    *) fail "doctor did not pass a fresh installation" ;;
+esac
+[ "$(doc_status)" -eq 0 ] || fail "doctor exited non-zero on a healthy installation"
+
+# A missing link must be reported and must fail the exit status.
+unlink "$doc_home/.ssh/config"
+case "$(run_doc "$repo/doctor.sh")" in
+    *"is missing. Run ./update.sh"*) ;;
+    *) fail "doctor did not report a missing link" ;;
+esac
+[ "$(doc_status)" -ne 0 ] || fail "doctor exited zero with a missing link"
+run_doc "$repo/update.sh" >/dev/null
+
+# A link back into the checkout breaks the rule the design rests on.
+unlink "$doc_home/.config/git"
+ln -s "$repo/config/git" "$doc_home/.config/git"
+case "$(run_doc "$repo/doctor.sh")" in
+    *"resolves into a checkout"*) ;;
+    *) fail "doctor did not report a link into the checkout" ;;
+esac
+run_doc "$repo/install.sh" git ssh >/dev/null
+
+# An edit written into the prefix is a warning, not a failure: nothing is broken
+# yet, but the next update would discard it.
+printf '%s\n' "edited in place" >>"$doc_prefix/git/config"
+case "$(run_doc "$repo/doctor.sh")" in
+    *"was edited in place"*) ;;
+    *) fail "doctor did not report an edit made to the installed copy" ;;
+esac
+[ "$(doc_status)" -eq 0 ] || fail "doctor treated a local edit as a failure"
+
+# Read-only: the edit must survive being diagnosed.
+grep -Fq "edited in place" "$doc_prefix/git/config" ||
+    fail "doctor modified the installed copy"
+
+# --- a private checkout with no payload is reported, not skipped -------------
+
+# An overlay that exists but has nothing to publish used to be indistinguishable
+# from one that does not exist. Only the second is normal.
+warn_home="$test_root/warn-home"
+warn_state="$test_root/warn-state"
+old_layout="$test_root/overlay-old-layout"
+empty_layout="$test_root/overlay-empty"
+mkdir -p "$warn_home" "$old_layout/git" "$empty_layout/config"
+printf '[user]\n\tname = Example\n' >"$old_layout/git/config"
+
+run_warn() {
+    HOME="$warn_home" XDG_STATE_HOME="$warn_state" DOTFILES_PRIVATE_ROOT="$1" \
+        "$repo/install.sh" git 2>&1 || true
+}
+
+case "$(run_warn "$old_layout")" in
+    *"has no config/ directory"*) ;;
+    *) fail "an overlay in the pre-config layout was skipped without warning" ;;
+esac
+
+case "$(run_warn "$empty_layout")" in
+    *"is empty, so nothing will be published"*) ;;
+    *) fail "an overlay with an empty config/ was skipped without warning" ;;
+esac
+
+# No overlay at all is the ordinary case and must stay quiet.
+case "$(run_warn "$test_root/overlay-absent")" in
+    *Warning*) fail "a missing overlay produced a warning" ;;
+esac
 
 # --- uninstall refuses targets it no longer owns -----------------------------
 

@@ -11,6 +11,7 @@ local overlay.
 - [Layout](#layout)
 - [Install](#install)
 - [Update](#update)
+- [Doctor](#doctor)
 - [Private overlay](#private-overlay)
 - [Uninstall](#uninstall)
 - [Development](#development)
@@ -27,6 +28,7 @@ config/           everything here is published, nothing else is
 lib/              the installer itself
 install.sh        publishes the checkout and links selected components
 update.sh         republishes the checkout after editing it
+doctor.sh         reports whether this machine's installation is healthy
 uninstall.sh      removes selected components and restores prior configuration
 ```
 
@@ -108,9 +110,28 @@ To see what is stale without writing anything:
 prompt or a scheduled job.
 
 Because `git config --global` writes through the XDG symlink, it edits the
-*installed* copy rather than the checkout. Copy such changes back into the
-checkout to keep them under version control; `./update.sh --check` will report
-them as drift until you do.
+*installed* copy rather than the checkout. The installer records what it
+published, so it can tell that kind of edit from a stale checkout: `update.sh`
+copies it into `~/.local/state/dotfiles-installer/backups/local/` before
+replacing it, and says so. Move anything worth keeping into the checkout, where
+it is version-controlled.
+
+## Doctor
+
+To check whether this machine's installation is healthy:
+
+```bash
+./doctor.sh
+```
+
+It reports the payload each checkout publishes, where every component link
+points, whether anything under `$HOME` resolves back into a checkout, whether
+the installed copy carries edits the next update would replace, and whether Git
+and SSH resolve their configuration.
+
+Read-only. It never repairs anything, so it is safe to run when something
+already looks wrong. It exits non-zero on a failure, so it can gate a shell
+prompt or a scheduled job. `./update.sh` is what repairs links and republishes.
 
 ## Private overlay
 
@@ -180,8 +201,8 @@ Neither checkout is ever deleted.
 Run the local checks with:
 
 ```bash
-shellcheck -x install.sh update.sh uninstall.sh lib/dotfiles.sh tests/*.sh
-shfmt -d -i 4 -ci -kp install.sh update.sh uninstall.sh lib/dotfiles.sh tests/*.sh
+shellcheck -x ./*.sh lib/*.sh tests/*.sh
+shfmt -d -i 4 -ci -kp ./*.sh lib/*.sh tests/*.sh
 bash tests/install-uninstall.sh
 bash tests/architecture.sh
 bash tests/commit-message.sh
