@@ -892,7 +892,7 @@ dotfiles_doctor_local_edits() {
         [ -f "$path" ] || continue
 
         digest="$(dotfiles_digest "$path")"
-        if [ "$digest" != "$(cat "$record")" ]; then
+        if [ "$digest" != "$(dotfiles_manifest_read "$path")" ]; then
             found=1
             dotfiles_report warn "$path was edited in place; ./update.sh will replace it"
         fi

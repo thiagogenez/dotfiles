@@ -399,7 +399,7 @@ case "$rt_output" in
 $rt_output
 ssh -G said: $(HOME="$rt_home" ssh -F "$rt_home/.ssh/config" -G build.example.com 2>&1 | head -2 | tr '\n' ' ')
 ~/.ssh/config: $(ls -l "$rt_home/.ssh/config" 2>&1)
-contents: $(cat "$rt_home/.ssh/config" 2>&1 | tr '\n' ' ')
+contents: $(tr '\n' ' ' <"$rt_home/.ssh/config" 2>&1)
 include target: $(ls -l "$rt_home/.local/share/dotfiles-private/ssh/config" 2>&1)" ;;
 esac
 [ "$(rt_status)" -eq 0 ] || fail "doctor failed on correct routing"
