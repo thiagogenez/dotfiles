@@ -12,6 +12,7 @@ same ground with the detail an agent needs.
 - [What belongs here](#what-belongs-here)
 - [Running the checks](#running-the-checks)
 - [The rule that carries the design](#the-rule-that-carries-the-design)
+- [Issues](#issues)
 - [Pull requests](#pull-requests)
 - [Secrets](#secrets)
 
@@ -66,6 +67,22 @@ machine; both are single binaries with no dependency tree.
 overlap. These are contributor and CI tools only. Running the installer needs
 bash and git, nothing more, and that must stay true.
 
+Two ways a local run disagrees with CI, both of which have cost round trips
+here. The runner's shellcheck is older than a current Homebrew one and still
+reports SC2002, the useless use of `cat`, which a newer local binary does not.
+When a lint failure will not reproduce, run the version CI runs:
+
+```bash
+docker run --rm -v "$PWD:/mnt" -w /mnt \
+    koalaman/shellcheck:v0.9.0 -x ./*.sh lib/*.sh tests/*.sh
+docker run --rm -v "$PWD:/mnt" -w /mnt \
+    mvdan/shfmt:v3.13.1 -d -i 4 -ci -kp ./*.sh lib/*.sh tests/*.sh
+```
+
+And never check formatting with `shfmt -d ... >/dev/null && echo ok`. shfmt
+exits 1 when it finds a difference, so the `echo` never runs and the absence of
+output reads as success.
+
 ## Optional tooling
 
 Two conventions here are easier to follow with help. Commit messages take a
@@ -108,6 +125,13 @@ functional test and only fails for callers without access to that directory.
 The test suite asserts the rule directly, and that assertion should not be
 weakened to make a change pass.
 
+## Issues
+
+The forms ask for three things: the problem, what you propose, and why it is
+worth doing. Put a console example in the problem. A pasted command and its
+output tells a reader more than a paragraph describing them, and it is what
+someone needs to reproduce what you saw.
+
 ## Pull requests
 
 Write the title as a Conventional Commit; a squash merge takes it as the
@@ -116,11 +140,22 @@ subject at 50 characters where you can, 72 at the outside, lowercase after the
 colon, with no trailing period. Add a body only when the diff does not explain
 why, and always for breaking changes, security fixes, and reverts.
 
-In the body of the pull request, cover the linked issue, what changed, how you
-validated it, and any risks, limitations, or open questions.
+The body has six sections, and the template gives you the headings: the problem,
+what it looked like before, what it looks like after, how it is implemented, how
+you validated it, and what the change does not cover.
+
+Before and after show the same input twice, with the wrong result and then the
+right one. That is what lets a reviewer judge the change without reconstructing
+the failure themselves. For a documentation change they become what a reader had
+and what a reader gets.
 
 On validation: name the commands and their results rather than writing "tests
 pass". If you checked something by hand, describe what you looked at.
+
+Two rules apply to both issues and pull requests. Examples use fictional paths
+and identities, because this repository is public and a real path names a
+machine and a person. Output shown in an example is copied from the code that
+prints it, rather than written from memory.
 
 Commits on `main` are signed by the repository owner, so a maintainer may ask to
 land your work through a squash merge.

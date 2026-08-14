@@ -2,29 +2,41 @@ name: Fix
 description: Something behaves incorrectly
 labels: ["fix"]
 body:
+  - type: markdown
+    attributes:
+      value: >
+        Examples use fictional paths and identities, such as `~/src/dotfiles` or
+        `personal@example.com`. This repository is public, and a real path names a machine
+        and a person.
+
   - type: textarea
     id: problem
     attributes:
       label: Problem
-      description: What behaves incorrectly, and under what conditions.
-    validations:
-      required: true
-
-  - type: textarea
-    id: observed
-    attributes:
-      label: Observed behaviour
       description: >
-        What actually happens. Paste the command and its output. Include the error text
-        verbatim rather than describing it.
-      render: shell
+        What behaves incorrectly, and under what conditions. Paste the command and its
+        output in a fenced block, with the error text verbatim rather than described. A
+        reader should be able to reproduce what you saw from what you paste.
     validations:
       required: true
 
   - type: textarea
-    id: expected
+    id: proposal
     attributes:
-      label: Expected behaviour
+      label: Proposal
+      description: >
+        What should happen instead, and the change that would get there. Be specific
+        enough that someone else could implement it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: >
+        Why this is worth fixing. Who runs into it, how the failure surfaces, and what it
+        costs. A bug that fails silently or points away from its cause is worth saying so.
     validations:
       required: true
 
