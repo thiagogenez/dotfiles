@@ -55,6 +55,9 @@ $(find "$home" -type l 2>/dev/null)
 EOF
 }
 
+# Without this, an unexpected non-zero exit under set -e ends the run with no
+# message at all, which is the worst kind of test failure to debug.
+trap 'echo "FAIL: unexpected error at line $LINENO" >&2' ERR
 trap cleanup EXIT
 
 # --- fresh installation ------------------------------------------------------
