@@ -377,13 +377,21 @@ rt_status() {
 
 write_overlay ordered
 run_rt "$repo/install.sh" --all >/dev/null
-case "$(run_rt "$repo/doctor.sh")" in
+
+# Report what doctor actually said, so a failure here is diagnosable from a CI
+# log instead of needing a local reproduction on the same platform.
+rt_output="$(run_rt "$repo/doctor.sh")"
+case "$rt_output" in
     *"selects work@example.com"*) ;;
-    *) fail "doctor did not verify a gitdir condition against a real repository" ;;
+    *) fail "doctor did not verify a gitdir condition. Output:
+$rt_output
+git resolved: $(HOME="$rt_home" git -C "$rt_work/project" config --get user.email)" ;;
 esac
-case "$(run_rt "$repo/doctor.sh")" in
+case "$rt_output" in
     *"build.example.com resolves to specific"*) ;;
-    *) fail "doctor did not verify a Host block against ssh -G" ;;
+    *) fail "doctor did not verify a Host block. Output:
+$rt_output
+ssh resolved: $(HOME="$rt_home" ssh -G build.example.com 2>&1 | awk '/^user /{print $2}')" ;;
 esac
 [ "$(rt_status)" -eq 0 ] || fail "doctor failed on correct routing"
 
