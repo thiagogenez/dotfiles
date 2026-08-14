@@ -129,6 +129,15 @@ points, whether anything under `$HOME` resolves back into a checkout, whether
 the installed copy carries edits the next update would replace, and whether Git
 and SSH resolve their configuration.
 
+It also checks that identity routing does what the overlay claims. Each
+`includeIf "gitdir:..."` is tested against a real repository under that
+directory, and each `Host` block that fixes a user is tested with `ssh -G`.
+Nothing is hardcoded: the expectations come from your own configuration. This
+catches the failures a parsing check cannot, such as a `Host` block placed after
+a broader wildcard, which SSH ignores while the file still parses. A condition
+with nothing to test against is reported as skipped rather than assumed
+correct.
+
 Read-only. It never repairs anything, so it is safe to run when something
 already looks wrong. It exits non-zero on a failure, so it can gate a shell
 prompt or a scheduled job. `./update.sh` is what repairs links and republishes.

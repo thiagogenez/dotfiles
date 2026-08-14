@@ -55,6 +55,12 @@ $(find "$home" -type l 2>/dev/null)
 EOF
 }
 
+# Without this, an unexpected non-zero exit under set -e ends the run with no
+# message at all, which is the worst kind of test failure to debug.
+# Git reads $XDG_CONFIG_HOME/git/config before $HOME/.config. Leaving that
+# variable to the environment lets the machine running the suite decide which
+# configuration is under test, which is how CI diverged from a local run.
+trap 'echo "FAIL: unexpected error at line $LINENO" >&2' ERR
 trap cleanup EXIT
 
 # --- fresh installation ------------------------------------------------------
@@ -64,7 +70,7 @@ fresh_state="$test_root/fresh-state"
 fresh_prefix="$fresh_home/.local/share/dotfiles"
 mkdir -p "$fresh_home"
 
-HOME="$fresh_home" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+HOME="$fresh_home" XDG_CONFIG_HOME="$fresh_home/.config" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/install.sh" --all
 assert_link "$fresh_home/.config/git" "$fresh_prefix/git"
 assert_link "$fresh_home/.ssh/config" "$fresh_prefix/ssh/config"
@@ -76,7 +82,7 @@ assert_same "$fresh_prefix/git/ignore" "$repo/config/git/ignore"
 assert_same "$fresh_prefix/ssh/config" "$repo/config/ssh/config"
 
 # A second installation must leave links intact without creating another backup.
-HOME="$fresh_home" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+HOME="$fresh_home" XDG_CONFIG_HOME="$fresh_home/.config" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/install.sh" --all
 assert_link "$fresh_home/.config/git" "$fresh_prefix/git"
 assert_link "$fresh_home/.ssh/config" "$fresh_prefix/ssh/config"
@@ -84,40 +90,40 @@ assert_link "$fresh_home/.ssh/config" "$fresh_prefix/ssh/config"
 # --- update ------------------------------------------------------------------
 
 # A clean tree reports no work and exits zero.
-HOME="$fresh_home" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+HOME="$fresh_home" XDG_CONFIG_HOME="$fresh_home/.config" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/update.sh" --check >/dev/null ||
     fail "--check reported drift on a freshly installed tree"
 
 # Drift in the installed copy is detected, reported, and repaired.
 printf '%s\n' "hand-edited installed copy" >>"$fresh_prefix/git/config"
-if HOME="$fresh_home" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+if HOME="$fresh_home" XDG_CONFIG_HOME="$fresh_home/.config" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/update.sh" --check >/dev/null; then
     fail "--check did not detect a modified installed copy"
 fi
 
-HOME="$fresh_home" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+HOME="$fresh_home" XDG_CONFIG_HOME="$fresh_home/.config" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/update.sh" >/dev/null
 assert_same "$fresh_prefix/git/config" "$repo/config/git/config"
 
-HOME="$fresh_home" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+HOME="$fresh_home" XDG_CONFIG_HOME="$fresh_home/.config" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/update.sh" --check >/dev/null ||
     fail "--check still reported drift after update"
 
 # Files that no longer exist in the source are pruned from the installed copy.
 printf '%s\n' "orphan" >"$fresh_prefix/git/removed-upstream"
-HOME="$fresh_home" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+HOME="$fresh_home" XDG_CONFIG_HOME="$fresh_home/.config" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/update.sh" >/dev/null
 assert_absent "$fresh_prefix/git/removed-upstream"
 
 # A deleted link is restored without disturbing the installed copy.
 unlink "$fresh_home/.ssh/config"
-HOME="$fresh_home" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+HOME="$fresh_home" XDG_CONFIG_HOME="$fresh_home/.config" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/update.sh" >/dev/null
 assert_link "$fresh_home/.ssh/config" "$fresh_prefix/ssh/config"
 
 # --- uninstall ---------------------------------------------------------------
 
-HOME="$fresh_home" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+HOME="$fresh_home" XDG_CONFIG_HOME="$fresh_home/.config" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/uninstall.sh" --all
 assert_absent "$fresh_home/.config/git"
 assert_absent "$fresh_home/.ssh/config"
@@ -136,7 +142,7 @@ grep -Fq "hand-edited installed copy" \
     fail "component markers were not removed"
 
 # Update on an empty installation is a no-op, not an error.
-HOME="$fresh_home" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+HOME="$fresh_home" XDG_CONFIG_HOME="$fresh_home/.config" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/update.sh" >/dev/null || fail "update failed with nothing installed"
 
 # --- an edit to the installed copy is detected and preserved -----------------
@@ -151,7 +157,7 @@ mkdir -p "$local_home"
 run_local() {
     # --check exits non-zero by design, so capture rather than pipe: under
     # pipefail the exit status would mask a successful grep.
-    HOME="$local_home" XDG_STATE_HOME="$local_state" \
+    HOME="$local_home" XDG_CONFIG_HOME="$local_home/.config" XDG_STATE_HOME="$local_state" \
         DOTFILES_PRIVATE_ROOT="$no_private" "$@" 2>&1 || true
 }
 
@@ -193,7 +199,7 @@ printf '%s\n' "original Git configuration" >"$existing_home/.config/git/config"
 printf '%s\n' "original ignore rules" >"$existing_home/.config/git/ignore"
 printf '%s\n' "original SSH configuration" >"$existing_home/.ssh/config"
 
-HOME="$existing_home" XDG_STATE_HOME="$existing_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+HOME="$existing_home" XDG_CONFIG_HOME="$existing_home/.config" XDG_STATE_HOME="$existing_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/install.sh" git ssh
 assert_link "$existing_home/.config/git" "$existing_prefix/git"
 assert_link "$existing_home/.ssh/config" "$existing_prefix/ssh/config"
@@ -208,7 +214,7 @@ grep -Fqx "original SSH configuration" \
     "$existing_state/dotfiles-installer/backups/.ssh/config" ||
     fail "SSH configuration was not preserved"
 
-HOME="$existing_home" XDG_STATE_HOME="$existing_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+HOME="$existing_home" XDG_CONFIG_HOME="$existing_home/.config" XDG_STATE_HOME="$existing_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/uninstall.sh" --all
 [ ! -L "$existing_home/.config/git" ] || fail "restored Git configuration is still a link"
 [ ! -L "$existing_home/.ssh/config" ] || fail "restored SSH configuration is still a link"
@@ -229,7 +235,7 @@ mkdir -p "$legacy_home/.config" "$legacy_home/.ssh"
 ln -s "$repo/config/git" "$legacy_home/.config/git"
 ln -s "$repo/config/ssh/config" "$legacy_home/.ssh/config"
 
-HOME="$legacy_home" XDG_STATE_HOME="$legacy_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+HOME="$legacy_home" XDG_CONFIG_HOME="$legacy_home/.config" XDG_STATE_HOME="$legacy_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/install.sh" git ssh
 assert_link "$legacy_home/.config/git" "$legacy_prefix/git"
 assert_link "$legacy_home/.ssh/config" "$legacy_prefix/ssh/config"
@@ -246,7 +252,7 @@ private_prefix="$private_home/.local/share/dotfiles-private"
 mkdir -p "$private_home" "$private_root/config/gnupg"
 printf '%s\n' "pinentry-program /example/pinentry" >"$private_root/config/gnupg/gpg-agent.conf"
 
-HOME="$private_home" XDG_STATE_HOME="$private_state" DOTFILES_PRIVATE_ROOT="$private_root" \
+HOME="$private_home" XDG_CONFIG_HOME="$private_home/.config" XDG_STATE_HOME="$private_state" DOTFILES_PRIVATE_ROOT="$private_root" \
     "$repo/install.sh" gnupg
 assert_link "$private_home/.gnupg/gpg-agent.conf" "$private_prefix/gnupg/gpg-agent.conf"
 assert_same "$private_prefix/gnupg/gpg-agent.conf" "$private_root/config/gnupg/gpg-agent.conf"
@@ -257,11 +263,11 @@ case "$(readlink "$private_home/.gnupg/gpg-agent.conf")" in
 esac
 
 printf '%s\n' "pinentry-program /example/updated" >"$private_root/config/gnupg/gpg-agent.conf"
-HOME="$private_home" XDG_STATE_HOME="$private_state" DOTFILES_PRIVATE_ROOT="$private_root" \
+HOME="$private_home" XDG_CONFIG_HOME="$private_home/.config" XDG_STATE_HOME="$private_state" DOTFILES_PRIVATE_ROOT="$private_root" \
     "$repo/update.sh" >/dev/null
 assert_same "$private_prefix/gnupg/gpg-agent.conf" "$private_root/config/gnupg/gpg-agent.conf"
 
-HOME="$private_home" XDG_STATE_HOME="$private_state" DOTFILES_PRIVATE_ROOT="$private_root" \
+HOME="$private_home" XDG_CONFIG_HOME="$private_home/.config" XDG_STATE_HOME="$private_state" DOTFILES_PRIVATE_ROOT="$private_root" \
     "$repo/uninstall.sh" gnupg
 assert_absent "$private_home/.gnupg/gpg-agent.conf"
 assert_absent "$private_prefix"
@@ -274,12 +280,12 @@ doc_prefix="$doc_home/.local/share/dotfiles"
 mkdir -p "$doc_home"
 
 run_doc() {
-    HOME="$doc_home" XDG_STATE_HOME="$doc_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+    HOME="$doc_home" XDG_CONFIG_HOME="$doc_home/.config" XDG_STATE_HOME="$doc_state" DOTFILES_PRIVATE_ROOT="$no_private" \
         "$@" 2>&1 || true
 }
 
 doc_status() {
-    HOME="$doc_home" XDG_STATE_HOME="$doc_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+    HOME="$doc_home" XDG_CONFIG_HOME="$doc_home/.config" XDG_STATE_HOME="$doc_state" DOTFILES_PRIVATE_ROOT="$no_private" \
         "$repo/doctor.sh" >/dev/null 2>&1
     echo "$?"
 }
@@ -327,6 +333,109 @@ esac
 grep -Fq "edited in place" "$doc_prefix/git/config" ||
     fail "doctor modified the installed copy"
 
+# --- doctor checks routing, not just that configuration parses ---------------
+
+# A parsing check passes while identity routing is broken, which is the failure
+# that reaches other people: commits authored under the wrong address, or a
+# connection made as the wrong user.
+rt_home="$test_root/routing-home"
+rt_state="$test_root/routing-state"
+rt_overlay="$test_root/routing-overlay"
+rt_work="$test_root/routing-work"
+mkdir -p "$rt_home" "$rt_overlay/config/git" "$rt_overlay/config/ssh" "$rt_work/project"
+git -C "$rt_work/project" init -q
+
+# Git matches gitdir: against the resolved path. On macOS mktemp hands back a
+# path under /var, which is a symlink to /private/var, so the condition would
+# never match the repository it names.
+rt_work_real="$(cd "$rt_work" && pwd -P)"
+
+write_overlay() {
+    # $1 selects whether the specific Host block precedes the wildcard.
+    if [ "$1" = "shadowed" ]; then
+        printf 'Host *.example.com\n    User generic\nHost build.example.com\n    User specific\n'
+    else
+        printf 'Host build.example.com\n    User specific\nHost *.example.com\n    User generic\n'
+    fi >"$rt_overlay/config/ssh/config"
+
+    cat >"$rt_overlay/config/git/config" <<CONF
+[user]
+	name = Example
+[includeIf "gitdir:$rt_work_real/"]
+	path = $rt_home/.local/share/dotfiles-private/git/${2:-work}
+CONF
+    printf '[user]\n\temail = work@example.com\n' >"$rt_overlay/config/git/work"
+}
+
+run_rt() {
+    HOME="$rt_home" XDG_CONFIG_HOME="$rt_home/.config" XDG_STATE_HOME="$rt_state" DOTFILES_PRIVATE_ROOT="$rt_overlay" \
+        "$@" 2>&1 || true
+}
+
+rt_status() {
+    HOME="$rt_home" XDG_CONFIG_HOME="$rt_home/.config" XDG_STATE_HOME="$rt_state" DOTFILES_PRIVATE_ROOT="$rt_overlay" \
+        "$repo/doctor.sh" >/dev/null 2>&1
+    echo "$?"
+}
+
+write_overlay ordered
+run_rt "$repo/install.sh" --all >/dev/null
+
+# Report what doctor actually said, so a failure here is diagnosable from a CI
+# log instead of needing a local reproduction on the same platform.
+rt_output="$(run_rt "$repo/doctor.sh")"
+
+# Built before use rather than inside the message: a multi-line pipeline inside
+# a quoted argument is awkward to read and shfmt reindents it.
+rt_git_origins="$(HOME="$rt_home" XDG_CONFIG_HOME="$rt_home/.config" \
+    git -C "$rt_work/project" config --list --show-origin 2>&1 | tr '\n' ' ')"
+rt_ssh_said="$(HOME="$rt_home" ssh -F "$rt_home/.ssh/config" -G build.example.com 2>&1 |
+    head -2 | tr '\n' ' ')"
+
+case "$rt_output" in
+    *"selects work@example.com"*) ;;
+    *) fail "doctor did not verify a gitdir condition. Output:
+$rt_output
+condition: gitdir:$rt_work_real/  repo: $rt_work/project
+git origins: $rt_git_origins" ;;
+esac
+case "$rt_output" in
+    *"build.example.com resolves to specific"*) ;;
+    *) fail "doctor did not verify a Host block. Output:
+$rt_output
+ssh said: $rt_ssh_said" ;;
+esac
+[ "$(rt_status)" -eq 0 ] || fail "doctor failed on correct routing"
+
+# A specific Host after a wildcard is ignored by SSH, and the file still parses.
+write_overlay shadowed
+run_rt "$repo/update.sh" >/dev/null
+case "$(run_rt "$repo/doctor.sh")" in
+    *"declares user specific but resolves generic"*) ;;
+    *) fail "doctor did not catch a Host block shadowed by a wildcard" ;;
+esac
+[ "$(rt_status)" -ne 0 ] || fail "shadowed routing did not fail the exit status"
+
+# An include target that no longer exists, which is what a rename produces.
+write_overlay ordered renamed
+run_rt "$repo/update.sh" >/dev/null
+case "$(run_rt "$repo/doctor.sh")" in
+    *"which is missing"*) ;;
+    *) fail "doctor did not report an include target that does not exist" ;;
+esac
+
+# Nothing to test against is reported as skipped rather than guessed at.
+write_overlay ordered
+sed -i.bak "s|gitdir:$rt_work_real/|gitdir:$test_root/routing-absent/|" \
+    "$rt_overlay/config/git/config"
+rm -f "$rt_overlay/config/git/config.bak"
+run_rt "$repo/update.sh" >/dev/null
+case "$(run_rt "$repo/doctor.sh")" in
+    *"has no repository to test against"*) ;;
+    *) fail "doctor did not skip a gitdir condition it could not evaluate" ;;
+esac
+[ "$(rt_status)" -eq 0 ] || fail "a skipped check was treated as a failure"
+
 # --- a private checkout with no payload is reported, not skipped -------------
 
 # An overlay that exists but has nothing to publish used to be indistinguishable
@@ -339,7 +448,7 @@ mkdir -p "$warn_home" "$old_layout/git" "$empty_layout/config"
 printf '[user]\n\tname = Example\n' >"$old_layout/git/config"
 
 run_warn() {
-    HOME="$warn_home" XDG_STATE_HOME="$warn_state" DOTFILES_PRIVATE_ROOT="$1" \
+    HOME="$warn_home" XDG_CONFIG_HOME="$warn_home/.config" XDG_STATE_HOME="$warn_state" DOTFILES_PRIVATE_ROOT="$1" \
         "$repo/install.sh" git 2>&1 || true
 }
 
@@ -365,13 +474,13 @@ protected_state="$test_root/protected-state"
 mkdir -p "$protected_home/.config/git"
 printf '%s\n' "configuration to preserve" >"$protected_home/.config/git/config"
 
-HOME="$protected_home" XDG_STATE_HOME="$protected_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+HOME="$protected_home" XDG_CONFIG_HOME="$protected_home/.config" XDG_STATE_HOME="$protected_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/install.sh" git
 unlink "$protected_home/.config/git"
 mkdir -p "$protected_home/.config/git"
 printf '%s\n' "replacement configuration" >"$protected_home/.config/git/config"
 
-if HOME="$protected_home" XDG_STATE_HOME="$protected_state" \
+if HOME="$protected_home" XDG_CONFIG_HOME="$protected_home/.config" XDG_STATE_HOME="$protected_state" \
     DOTFILES_PRIVATE_ROOT="$no_private" "$repo/uninstall.sh" git; then
     fail "uninstall accepted a target no longer owned by this clone"
 fi
