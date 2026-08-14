@@ -803,11 +803,24 @@ dotfiles_report() {
     case "$status" in
         ok) printf '  ok    %s\n' "$message" ;;
         warn) printf '  warn  %s\n' "$message" ;;
+        skip) printf '  skip  %s\n' "$message" ;;
         bad)
             printf '  FAIL  %s\n' "$message"
             DOTFILES_DOCTOR_FAILED=1
             ;;
     esac
+}
+
+# Paths inside a configuration file arrive as literal text, so a leading tilde
+# is a character rather than something the shell already expanded.
+dotfiles_expand_tilde() {
+    local path="$1" rest="${1#\~/}"
+
+    if [ "$rest" != "$path" ]; then
+        printf '%s' "$HOME/$rest"
+    else
+        printf '%s' "$path"
+    fi
 }
 
 # Does every installed component still point where it should?
@@ -913,6 +926,100 @@ dotfiles_doctor_payload() {
     done
 }
 
+# Each `includeIf "gitdir:..."` claims that repositories under a directory get a
+# particular identity. Ask Git whether one actually does. A parsing check cannot
+# catch this: user.name resolves from the top of the overlay whether or not any
+# condition still matches, so broken routing looks healthy while commits carry
+# the wrong address.
+dotfiles_doctor_git_routing() {
+    local config="$DOTFILES_PRIVATE_PREFIX/git/config" listing entry
+    local dir target expected repo actual found=0
+
+    [ -f "$config" ] || return 0
+
+    listing="$(git config --file "$config" --list 2>/dev/null |
+        sed -n 's|^includeif\.gitdir:\(.*\)\.path=\(.*\)$|\1 \2|p' || true)"
+
+    while IFS=' ' read -r dir target; do
+        [ -n "$dir" ] || continue
+        found=1
+
+        dir="$(dotfiles_expand_tilde "$dir")"
+        target="$(dotfiles_expand_tilde "$target")"
+
+        if [ ! -f "$target" ]; then
+            dotfiles_report bad "gitdir:$dir points at $target, which is missing"
+            continue
+        fi
+
+        expected="$(git config --file "$target" --get user.email 2>/dev/null || true)"
+        if [ -z "$expected" ]; then
+            dotfiles_report skip "gitdir:$dir sets no email to compare"
+            continue
+        fi
+
+        repo="$(find "$dir" -maxdepth 3 -name .git -print -quit 2>/dev/null || true)"
+        if [ -z "$repo" ]; then
+            dotfiles_report skip "gitdir:$dir has no repository to test against"
+            continue
+        fi
+        repo="$(dirname "$repo")"
+
+        actual="$(git -C "$repo" config --get user.email 2>/dev/null || true)"
+        if [ "$actual" = "$expected" ]; then
+            dotfiles_report ok "gitdir:$dir selects $expected"
+        else
+            dotfiles_report bad "gitdir:$dir should select $expected, but $repo resolves $actual"
+        fi
+    done <<EOF
+$listing
+EOF
+
+    if [ "$found" -eq 0 ]; then
+        dotfiles_report skip "the overlay declares no gitdir routing"
+    fi
+}
+
+# A Host block that sets a User claims what `ssh -G` will answer. It stops being
+# true when a broader pattern precedes it, since SSH keeps the first value it
+# finds, and the file still parses either way.
+dotfiles_doctor_ssh_routing() {
+    local config="$DOTFILES_PRIVATE_PREFIX/ssh/config" line hosts host
+    local declared actual checked=0
+
+    [ -f "$config" ] || return 0
+
+    hosts=""
+    while IFS= read -r line; do
+        case "$line" in
+            [Hh]ost\ *)
+                hosts="${line#* }"
+                ;;
+            *[Uu]ser\ *)
+                declared="${line##* }"
+                for host in $hosts; do
+                    # A pattern cannot be resolved without inventing a hostname.
+                    case "$host" in
+                        *[*?]*) continue ;;
+                    esac
+
+                    checked=1
+                    actual="$(ssh -G "$host" 2>/dev/null | awk '/^user /{print $2; exit}' || true)"
+                    if [ "$actual" = "$declared" ]; then
+                        dotfiles_report ok "$host resolves to $declared"
+                    else
+                        dotfiles_report bad "$host declares user $declared but resolves $actual"
+                    fi
+                done
+                ;;
+        esac
+    done <"$config"
+
+    if [ "$checked" -eq 0 ]; then
+        dotfiles_report skip "the overlay declares no host with a fixed user"
+    fi
+}
+
 # Ask Git and SSH what they resolve to, rather than trusting the files to parse.
 dotfiles_doctor_resolution() {
     if command -v git >/dev/null 2>&1; then
@@ -964,6 +1071,10 @@ dotfiles_doctor() {
     echo
     echo "Resolution"
     dotfiles_doctor_resolution
+    echo
+    echo "Routing"
+    dotfiles_doctor_git_routing
+    dotfiles_doctor_ssh_routing
     echo
 
     if [ "$DOTFILES_DOCTOR_FAILED" -eq 1 ]; then
