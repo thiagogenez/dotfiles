@@ -384,23 +384,26 @@ run_rt "$repo/install.sh" --all >/dev/null
 # Report what doctor actually said, so a failure here is diagnosable from a CI
 # log instead of needing a local reproduction on the same platform.
 rt_output="$(run_rt "$repo/doctor.sh")"
+
+# Built before use rather than inside the message: a multi-line pipeline inside
+# a quoted argument is awkward to read and shfmt reindents it.
+rt_git_origins="$(HOME="$rt_home" XDG_CONFIG_HOME="$rt_home/.config" \
+    git -C "$rt_work/project" config --list --show-origin 2>&1 | tr '\n' ' ')"
+rt_ssh_said="$(HOME="$rt_home" ssh -F "$rt_home/.ssh/config" -G build.example.com 2>&1 |
+    head -2 | tr '\n' ' ')"
+
 case "$rt_output" in
     *"selects work@example.com"*) ;;
     *) fail "doctor did not verify a gitdir condition. Output:
 $rt_output
 condition: gitdir:$rt_work_real/  repo: $rt_work/project
-gitdir: $(HOME="$rt_home" XDG_CONFIG_HOME="$rt_home/.config" git -C "$rt_work/project" rev-parse --absolute-git-dir 2>&1)
-raw: $(HOME="$rt_home" XDG_CONFIG_HOME="$rt_home/.config" git -C "$rt_work/project" config --list --show-origin 2>&1 |
-    tr '\n' ' ')" ;;
+git origins: $rt_git_origins" ;;
 esac
 case "$rt_output" in
     *"build.example.com resolves to specific"*) ;;
     *) fail "doctor did not verify a Host block. Output:
 $rt_output
-ssh -G said: $(HOME="$rt_home" ssh -F "$rt_home/.ssh/config" -G build.example.com 2>&1 | head -2 | tr '\n' ' ')
-~/.ssh/config: $(ls -l "$rt_home/.ssh/config" 2>&1)
-contents: $(tr '\n' ' ' <"$rt_home/.ssh/config" 2>&1)
-include target: $(ls -l "$rt_home/.local/share/dotfiles-private/ssh/config" 2>&1)" ;;
+ssh said: $rt_ssh_said" ;;
 esac
 [ "$(rt_status)" -eq 0 ] || fail "doctor failed on correct routing"
 
