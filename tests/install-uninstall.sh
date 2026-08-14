@@ -385,13 +385,18 @@ case "$rt_output" in
     *"selects work@example.com"*) ;;
     *) fail "doctor did not verify a gitdir condition. Output:
 $rt_output
-git resolved: $(HOME="$rt_home" git -C "$rt_work/project" config --get user.email)" ;;
+condition: gitdir:$rt_work_real/  repo: $rt_work/project
+origins: $(HOME="$rt_home" git -C "$rt_work/project" config --list --show-origin 2>&1 |
+    grep -E "user\.|include" | tr '\n' ' ')" ;;
 esac
 case "$rt_output" in
     *"build.example.com resolves to specific"*) ;;
     *) fail "doctor did not verify a Host block. Output:
 $rt_output
-ssh resolved: $(HOME="$rt_home" ssh -G build.example.com 2>&1 | awk '/^user /{print $2}')" ;;
+ssh -G said: $(HOME="$rt_home" ssh -G build.example.com 2>&1 | head -2 | tr '\n' ' ')
+~/.ssh/config: $(ls -l "$rt_home/.ssh/config" 2>&1)
+contents: $(cat "$rt_home/.ssh/config" 2>&1 | tr '\n' ' ')
+include target: $(ls -l "$rt_home/.local/share/dotfiles-private/ssh/config" 2>&1)" ;;
 esac
 [ "$(rt_status)" -eq 0 ] || fail "doctor failed on correct routing"
 
