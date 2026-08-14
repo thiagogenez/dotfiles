@@ -1004,7 +1004,11 @@ dotfiles_doctor_ssh_routing() {
                     esac
 
                     checked=1
-                    actual="$(ssh -G "$host" 2>/dev/null | awk '/^user /{print $2; exit}' || true)"
+                    # Anchored at the file we linked: OpenSSH expands ~ from the
+                    # password database rather than $HOME, so an Include is not
+                    # guaranteed to resolve the same way a test harness expects.
+                    actual="$(ssh -F "$HOME/.ssh/config" -G "$host" 2>/dev/null |
+                        awk '/^user /{print $2; exit}' || true)"
                     if [ "$actual" = "$declared" ]; then
                         dotfiles_report ok "$host resolves to $declared"
                     else

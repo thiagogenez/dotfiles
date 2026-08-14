@@ -386,8 +386,9 @@ case "$rt_output" in
     *) fail "doctor did not verify a gitdir condition. Output:
 $rt_output
 condition: gitdir:$rt_work_real/  repo: $rt_work/project
-origins: $(HOME="$rt_home" git -C "$rt_work/project" config --list --show-origin 2>&1 |
-    grep -E "user\.|include" | tr '\n' ' ')" ;;
+gitdir: $(HOME="$rt_home" git -C "$rt_work/project" rev-parse --absolute-git-dir 2>&1)
+raw: $(HOME="$rt_home" git -C "$rt_work/project" config --list --show-origin 2>&1 |
+    tr '\n' ' ')" ;;
 esac
 case "$rt_output" in
     *"build.example.com resolves to specific"*) ;;
