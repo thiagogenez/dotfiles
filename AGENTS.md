@@ -13,7 +13,9 @@ for another agent, point it here too.
 - [What this project is](#what-this-project-is)
 - [The rule that carries the design](#the-rule-that-carries-the-design)
 - [Workflow](#workflow)
+- [Issues](#issues)
 - [Pull requests](#pull-requests)
+- [Writing issues and pull requests](#writing-issues-and-pull-requests)
 - [Commits](#commits)
 - [Local checks](#local-checks)
 - [Scope discipline](#scope-discipline)
@@ -69,22 +71,60 @@ prefix means changing those files too.
 
 Never commit directly to `main`.
 
+## Issues
+
+Three sections, in this order. The issue forms produce them.
+
+- **Problem.** What is wrong, with a console example showing the failure. Paste
+  the command and its output rather than describing them.
+- **Proposal.** What should change, specific enough that someone else could
+  implement it.
+- **Motivation.** Why it is worth doing, and why this shape of fix rather than a
+  weaker one.
+
+Extra sections are fine when a specific issue earns them, such as a constraint
+the implementation must respect or an approach already tried and reverted. The
+three above are the spine and come first.
+
+Do not add an "alternatives considered" section. A rejected approach belongs in
+the proposal, as the reason the proposed one is shaped the way it is.
+
 ## Pull requests
 
-Every pull request body must cover four things:
+Six sections, in this order.
 
-- **Issue.** Link it, and use `Closes #N` when the pull request resolves it.
-- **What changed.** The substance, not a file list. A reviewer should understand
-  the change without reading the diff first.
-- **How it was validated.** The commands you ran and what they returned. "Tests
-  pass" is not validation; name the suite and the result. If you verified
-  something by hand, say what you checked and what you saw.
-- **Risks, limitations, and next steps.** What could break, what the change
-  deliberately does not cover, and what remains open. If you found a problem and
-  left it, say so here rather than leaving it for the reviewer to find.
+- **Problem.** What is broken or missing. Link the issue, and use `Closes #N`
+  when the pull request resolves it.
+- **Before.** A real configuration or command, and the wrong result it produces.
+- **After.** The same input, and the right result.
+- **Implementation.** How it works, and the decisions a reviewer would otherwise
+  have to reconstruct from the diff.
+- **Validation.** The commands you ran and what they returned. "Tests pass" is
+  not validation; name the suite and the result. If you verified something by
+  hand, say what you checked and what you saw.
+- **Not covered.** What could break, what the change deliberately leaves out,
+  and what stays open. If you found a problem and left it, say so here rather
+  than letting the reviewer find it.
+
+`Before` and `After` show the same input twice so a reviewer can judge the fix
+without reconstructing the failure. Where a change has no observable behaviour,
+documentation for instance, they become what a reader had and what a reader
+gets. A section with nothing honest to put in it should be dropped, not filled.
+
+`Found on the way` is a useful seventh section for something true that the
+change did not set out to find.
 
 Write the title as a Conventional Commit, since squash merges take it as the
 commit subject.
+
+## Writing issues and pull requests
+
+Examples use fictional paths and identities: `~/src/dotfiles`,
+`personal@example.com`, `build.example.com`. This repository is public, and a
+real path names a machine and a person.
+
+Output quoted in an example is copied from the code that produces it. Do not
+invent a plausible message; find the `printf` and use what it prints.
 
 Do not hard-wrap issue and pull request bodies. GitHub renders a single newline
 in a comment as a line break, so text wrapped for a file arrives on the page as

@@ -7,20 +7,47 @@ subject. Example:
 Do not hard-wrap what you write below. GitHub renders a single newline in a
 comment as a line break, so wrapped text arrives as ragged short lines. Write
 each paragraph as one long line and let the page wrap it.
--->
 
-## Issue
+Examples use fictional paths and identities: ~/src/dotfiles,
+personal@example.com. This repository is public. Output shown in an example is
+copied from the code that prints it, not written from memory.
+-->
 
 Closes #
 
-## What changed
+## Problem
 
 <!--
-The substance, not a file list. A reviewer should understand the change before
-reading the diff.
+What is broken or missing, and why it matters. A reviewer should understand the
+change before reading the diff.
 -->
 
-## How it was validated
+## Before
+
+<!--
+A real configuration or command, and the wrong result it produces. For a change
+with no observable behaviour, documentation for instance, this is what a reader
+had.
+-->
+
+```text
+```
+
+## After
+
+<!-- The same input, and the right result. -->
+
+```text
+```
+
+## Implementation
+
+<!--
+How it works, and the decisions a reviewer would otherwise have to reconstruct
+from the diff.
+-->
+
+## Validation
 
 <!--
 The commands you ran and what they returned. "Tests pass" is not validation:
@@ -31,11 +58,11 @@ looked at and what you saw.
 ```text
 ```
 
-## Risks, limitations, and next steps
+## Not covered
 
 <!--
-What could break, what this deliberately does not cover, and what stays open. If
-you found a problem and left it, record it here rather than letting the reviewer
+What could break, what this deliberately leaves out, and what stays open. If you
+found a problem and left it, record it here rather than letting the reviewer
 discover it. Write "none" only when you have actually considered the question.
 -->
 

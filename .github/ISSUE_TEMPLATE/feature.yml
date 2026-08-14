@@ -2,11 +2,20 @@ name: Feature
 description: Add a capability that does not exist yet
 labels: ["feature"]
 body:
-  - type: textarea
-    id: rationale
+  - type: markdown
     attributes:
-      label: Rationale
-      description: What problem this solves, and who has it.
+      value: >
+        Examples use fictional paths and identities, such as `~/src/dotfiles` or
+        `personal@example.com`. This repository is public, and a real path names a machine
+        and a person.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: >
+        What is missing, and what someone has to do today because it is missing. Show the
+        workaround if there is one.
     validations:
       required: true
 
@@ -15,6 +24,16 @@ body:
     attributes:
       label: Proposal
       description: What the capability does and how it behaves.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: >
+        Why this is worth adding, and who has the problem. If you rejected another
+        approach, the reason belongs here rather than in a section of its own.
     validations:
       required: true
 

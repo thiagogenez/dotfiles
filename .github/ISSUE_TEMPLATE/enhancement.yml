@@ -2,11 +2,20 @@ name: Enhancement
 description: Improve behaviour that already exists
 labels: ["enhancement"]
 body:
-  - type: textarea
-    id: rationale
+  - type: markdown
     attributes:
-      label: Rationale
-      description: What is inconvenient, fragile, or unclear about the current behaviour.
+      value: >
+        Examples use fictional paths and identities, such as `~/src/dotfiles` or
+        `personal@example.com`. This repository is public, and a real path names a machine
+        and a person.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: >
+        What is inconvenient, fragile, or unclear about the current behaviour. Show it
+        where you can: a command and its output makes the case faster than a description.
     validations:
       required: true
 
@@ -15,6 +24,17 @@ body:
     attributes:
       label: Proposal
       description: What should change. Be specific enough that someone else could implement it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: >
+        Why this is worth doing, and why this shape of change rather than a smaller one.
+        If you rejected another approach, the reason belongs here rather than in a section
+        of its own.
     validations:
       required: true
 
