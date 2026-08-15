@@ -27,6 +27,14 @@ fail() {
     exit 1
 }
 
+assert_agent_skill_link() {
+    local link="$1" expected="../../.agents/skills/dotfiles-change"
+    [ -L "$link" ] || fail "expected agent skill link: $link"
+    [ "$(readlink "$link")" = "$expected" ] ||
+        fail "$link does not target $expected"
+    [ -f "$link/SKILL.md" ] || fail "agent skill link is broken: $link"
+}
+
 cleanup() {
     case "$(basename "$test_root")" in
         dotfiles-arch.*) rm -rf -- "$test_root" ;;
@@ -35,6 +43,9 @@ cleanup() {
 }
 
 trap cleanup EXIT
+
+assert_agent_skill_link "$repo/.claude/skills/dotfiles-change"
+assert_agent_skill_link "$repo/.codex/skills/dotfiles-change"
 
 run() {
     HOME="$home" XDG_STATE_HOME="$state" DOTFILES_PRIVATE_ROOT="$overlay" "$@"

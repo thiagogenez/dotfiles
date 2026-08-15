@@ -209,11 +209,16 @@ code from GitHub. Read what you are installing, and skip them freely: a pull
 request written by hand and a pull request written with them are judged the
 same way.
 
-Should this repository ever ship a skill of its own, the content belongs in
-`.agents/skills/<name>/SKILL.md`, with `.claude/skills/<name>` and
-`.codex/skills/<name>` as relative symlinks to it. One copy, one symlink per
-agent, so editing the skill reaches every agent at once. Git stores those
-symlinks natively, so a clone needs no setup step.
+This repository ships `dotfiles-change`, a focused workflow for planning,
+implementing, reviewing, and verifying non-trivial changes. Agents should use
+it for installer behavior, path ownership, private-overlay boundaries,
+contributor workflow, and cross-platform tests.
+
+Its canonical content lives at
+`.agents/skills/dotfiles-change/SKILL.md`. Claude and Codex discover the same
+copy through relative links at `.claude/skills/dotfiles-change` and
+`.codex/skills/dotfiles-change`. Edit the canonical copy only; Git stores the
+links, so a clone needs no setup step.
 
 The lifecycle test uses temporary home and state directories and never touches
 real user configuration. It also sets `DOTFILES_PRIVATE_ROOT` to a path that
