@@ -11,6 +11,7 @@ same ground with the detail an agent needs.
 - [Workflow](#workflow)
 - [What belongs here](#what-belongs-here)
 - [Running the checks](#running-the-checks)
+- [Pre-commit hook](#pre-commit-hook)
 - [The rule that carries the design](#the-rule-that-carries-the-design)
 - [Issues](#issues)
 - [Pull requests](#pull-requests)
@@ -48,13 +49,13 @@ Target Bash 3.2, which is what macOS ships. Associative arrays, `mapfile`, and
 ## Running the checks
 
 ```bash
-shellcheck -x ./*.sh lib/*.sh scripts/*.sh tests/*.sh
-shfmt -d -i 4 -ci -kp ./*.sh lib/*.sh scripts/*.sh tests/*.sh
+bash scripts/lint.sh
 bash tests/install-uninstall.sh
 bash tests/architecture.sh
 bash tests/commit-message.sh
 bash tests/pr-body-test.sh
 bash tests/pull-request-test.sh
+bash tests/pre-commit-test.sh
 ```
 
 `./doctor.sh` reports whether the current machine's installation is healthy. It
@@ -69,22 +70,41 @@ machine; both are single binaries with no dependency tree.
 overlap. These are contributor and CI tools only. Running the installer needs
 bash and git, nothing more, and that must stay true.
 
-Two ways a local run disagrees with CI, both of which have cost round trips
-here. The runner's shellcheck is older than a current Homebrew one and still
-reports SC2002, the useless use of `cat`, which a newer local binary does not.
-When a lint failure will not reproduce, run the version CI runs:
+CI pins ShellCheck 0.11.0 and shfmt 3.13.1. When a lint failure will not
+reproduce with locally installed tools, run those versions directly:
 
 ```bash
 docker run --rm -v "$PWD:/mnt" -w /mnt \
-    koalaman/shellcheck:v0.9.0 -x ./*.sh lib/*.sh scripts/*.sh tests/*.sh
+    koalaman/shellcheck:v0.11.0 -x \
+    ./*.sh lib/*.sh scripts/*.sh tests/*.sh .githooks/pre-commit
 docker run --rm -v "$PWD:/mnt" -w /mnt \
     mvdan/shfmt:v3.13.1 -d -i 4 -ci -kp \
-    ./*.sh lib/*.sh scripts/*.sh tests/*.sh
+    ./*.sh lib/*.sh scripts/*.sh tests/*.sh .githooks/pre-commit
 ```
 
 And never check formatting with `shfmt -d ... >/dev/null && echo ok`. shfmt
 exits 1 when it finds a difference, so the `echo` never runs and the absence of
 output reads as success.
+
+## Pre-commit hook
+
+Enable the versioned hook for the current clone once:
+
+```bash
+bash scripts/setup-hooks.sh
+```
+
+The setup changes only this repository's local `core.hooksPath`. Confirm it
+without changing configuration with `bash scripts/setup-hooks.sh --check`.
+The hook runs `bash scripts/lint.sh` before Git accepts a commit and blocks the
+commit when ShellCheck, shfmt, or a required contributor tool fails. It leaves
+the slower lifecycle and architecture suites for the full pre-PR checks.
+
+Disable the hook for this clone with:
+
+```bash
+git config --local --unset core.hooksPath
+```
 
 ## Optional tooling
 

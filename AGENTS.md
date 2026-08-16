@@ -156,18 +156,22 @@ Commits are signed by the repository owner. Agents must not run `git commit`,
 commits. Prepare and verify the changes, then hand over the exact command to
 run.
 
+Before handing over that command, run `bash scripts/setup-hooks.sh --check`.
+If the hook is inactive, tell the owner to run `bash scripts/setup-hooks.sh`;
+do not assume a versioned hook became active when the repository was cloned.
+
 ## Local checks
 
 Run these before opening a pull request:
 
 ```bash
-shellcheck -x ./*.sh lib/*.sh scripts/*.sh tests/*.sh
-shfmt -d -i 4 -ci -kp ./*.sh lib/*.sh scripts/*.sh tests/*.sh
+bash scripts/lint.sh
 bash tests/install-uninstall.sh
 bash tests/architecture.sh
 bash tests/commit-message.sh
 bash tests/pr-body-test.sh
 bash tests/pull-request-test.sh
+bash tests/pre-commit-test.sh
 ```
 
 `./doctor.sh` reports whether the current machine's installation is healthy. It
