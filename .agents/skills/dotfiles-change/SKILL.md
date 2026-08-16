@@ -12,6 +12,12 @@ description: >-
 Read `AGENTS.md` and the linked issue before changing files. Treat `AGENTS.md`
 as canonical when this workflow and the repository rules differ.
 
+Review this skill whenever `AGENTS.md` changes a rule, path, validation command,
+architectural invariant, supported shell version, or commit/PR workflow that
+this file references. Keep `AGENTS.md` canonical: update this workflow only
+when it would otherwise become stale or misleading, and do not copy volatile
+details from the canonical file.
+
 ## Ground the change
 
 1. Confirm that the issue states the problem, proposal, and motivation.
@@ -74,6 +80,3 @@ Stop when the acceptance conditions pass. Report:
 
 Never create or rewrite a commit. Never broaden the change merely because the
 review exposed an unrelated improvement.
-
-This workflow selectively adapts planning and verification practices from
-<https://github.com/thiagogenez/vibe-coding-toolkit>.
