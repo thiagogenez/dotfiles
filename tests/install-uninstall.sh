@@ -41,6 +41,14 @@ assert_same() {
     cmp -s "$left" "$right" || fail "$left differs from $right"
 }
 
+assert_no_ansi() {
+    local file="$1" escape
+    escape="$(printf '\033')"
+    if grep -F "$escape" "$file" >/dev/null; then
+        fail "$file contains terminal escapes without a terminal"
+    fi
+}
+
 # The whole point of the prefix indirection: nothing under $HOME may resolve
 # into the source checkout.
 assert_no_link_into_source() {
@@ -62,6 +70,46 @@ EOF
 # configuration is under test, which is how CI diverged from a local run.
 trap 'echo "FAIL: unexpected error at line $LINENO" >&2' ERR
 trap cleanup EXIT
+
+# Output captured per stream must stay plain even when TERM supports colour.
+plain_home="$test_root/plain-home"
+plain_state="$test_root/plain-state"
+plain_overlay="$test_root/plain-overlay"
+plain_stdout="$test_root/plain.stdout"
+plain_stderr="$test_root/plain.stderr"
+plain_doctor_stdout="$test_root/plain-doctor.stdout"
+plain_doctor_stderr="$test_root/plain-doctor.stderr"
+plain_error_stdout="$test_root/plain-error.stdout"
+plain_error_stderr="$test_root/plain-error.stderr"
+mkdir -p "$plain_home" "$plain_overlay"
+
+run_plain() {
+    unset NO_COLOR
+    HOME="$plain_home" XDG_CONFIG_HOME="$plain_home/.config" \
+        XDG_STATE_HOME="$plain_state" DOTFILES_PRIVATE_ROOT="$plain_overlay" \
+        TERM="xterm-256color" "$@"
+}
+
+run_plain "$repo/install.sh" --all >"$plain_stdout" 2>"$plain_stderr"
+run_plain "$repo/doctor.sh" >"$plain_doctor_stdout" 2>"$plain_doctor_stderr" || true
+if run_plain "$repo/install.sh" unknown \
+    >"$plain_error_stdout" 2>"$plain_error_stderr"; then
+    fail "an unknown component did not fail"
+fi
+assert_no_ansi "$plain_stdout"
+assert_no_ansi "$plain_stderr"
+assert_no_ansi "$plain_doctor_stdout"
+assert_no_ansi "$plain_doctor_stderr"
+assert_no_ansi "$plain_error_stdout"
+assert_no_ansi "$plain_error_stderr"
+grep -Fq "==> Components to install:" "$plain_stdout" ||
+    fail "plain stdout omitted the shared step prefix"
+grep -Fq "Warning:" "$plain_stderr" ||
+    fail "plain stderr omitted the shared warning prefix"
+grep -Fq "  ok" "$plain_doctor_stdout" ||
+    fail "plain doctor output omitted its report columns"
+grep -Fq "Error: Unknown component: unknown" "$plain_error_stderr" ||
+    fail "plain stderr omitted the shared error prefix"
 
 # --- fresh installation ------------------------------------------------------
 
