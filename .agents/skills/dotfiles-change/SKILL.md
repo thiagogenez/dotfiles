@@ -71,10 +71,20 @@ Run the focused regression first, then every local check from `AGENTS.md` before
 handoff. Report each command and its actual result. If a check cannot run, say
 why and what remains unverified.
 
-Before creating or editing a pull request, read
-`.github/PULL_REQUEST_TEMPLATE.md`, write the body from that template, and
-validate the completed file with
-`bash tests/pr-body.sh --file PATH_TO_PR_BODY`. Do not substitute a generic
+Before creating a pull request, use the repository-owned helper rather than a
+generic publishing workflow:
+
+```bash
+bash scripts/pull-request.sh prepare --issue NUMBER --output PATH_TO_PR_BODY
+# Fill every section with real evidence, then push the branch.
+bash scripts/pull-request.sh create --issue NUMBER --title TITLE \
+    --body-file PATH_TO_PR_BODY
+```
+
+The helper derives the body from `.github/pull_request_template.md` and refuses
+to call GitHub until the local title, body, issue reference, branch, and pushed
+commit pass their checks. Use `bash tests/pr-body.sh --file PATH_TO_PR_BODY`
+before editing the body of an existing pull request. Do not substitute a generic
 publishing template for the repository's headings.
 
 Stop when the acceptance conditions pass. Report:

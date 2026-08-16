@@ -48,12 +48,13 @@ Target Bash 3.2, which is what macOS ships. Associative arrays, `mapfile`, and
 ## Running the checks
 
 ```bash
-shellcheck -x ./*.sh lib/*.sh tests/*.sh
-shfmt -d -i 4 -ci -kp ./*.sh lib/*.sh tests/*.sh
+shellcheck -x ./*.sh lib/*.sh scripts/*.sh tests/*.sh
+shfmt -d -i 4 -ci -kp ./*.sh lib/*.sh scripts/*.sh tests/*.sh
 bash tests/install-uninstall.sh
 bash tests/architecture.sh
 bash tests/commit-message.sh
 bash tests/pr-body-test.sh
+bash tests/pull-request-test.sh
 ```
 
 `./doctor.sh` reports whether the current machine's installation is healthy. It
@@ -75,9 +76,10 @@ When a lint failure will not reproduce, run the version CI runs:
 
 ```bash
 docker run --rm -v "$PWD:/mnt" -w /mnt \
-    koalaman/shellcheck:v0.9.0 -x ./*.sh lib/*.sh tests/*.sh
+    koalaman/shellcheck:v0.9.0 -x ./*.sh lib/*.sh scripts/*.sh tests/*.sh
 docker run --rm -v "$PWD:/mnt" -w /mnt \
-    mvdan/shfmt:v3.13.1 -d -i 4 -ci -kp ./*.sh lib/*.sh tests/*.sh
+    mvdan/shfmt:v3.13.1 -d -i 4 -ci -kp \
+    ./*.sh lib/*.sh scripts/*.sh tests/*.sh
 ```
 
 And never check formatting with `shfmt -d ... >/dev/null && echo ok`. shfmt
@@ -147,6 +149,16 @@ you validated it, and what the change does not cover.
 
 All six headings are required. Do not rename or drop one to fit another pull
 request format.
+
+The repository helper prepares that template and validates it before opening a
+pull request:
+
+```bash
+bash scripts/pull-request.sh prepare --issue 42 --output /tmp/pr-42.md
+# Fill the prepared body, then push the branch.
+bash scripts/pull-request.sh create --issue 42 \
+    --title 'fix: describe the correction' --body-file /tmp/pr-42.md
+```
 
 Before and after show the same input twice, with the wrong result and then the
 right one. That is what lets a reviewer judge the change without reconstructing

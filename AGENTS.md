@@ -161,12 +161,13 @@ run.
 Run these before opening a pull request:
 
 ```bash
-shellcheck -x ./*.sh lib/*.sh tests/*.sh
-shfmt -d -i 4 -ci -kp ./*.sh lib/*.sh tests/*.sh
+shellcheck -x ./*.sh lib/*.sh scripts/*.sh tests/*.sh
+shfmt -d -i 4 -ci -kp ./*.sh lib/*.sh scripts/*.sh tests/*.sh
 bash tests/install-uninstall.sh
 bash tests/architecture.sh
 bash tests/commit-message.sh
 bash tests/pr-body-test.sh
+bash tests/pull-request-test.sh
 ```
 
 `./doctor.sh` reports whether the current machine's installation is healthy. It

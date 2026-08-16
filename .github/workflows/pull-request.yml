@@ -34,9 +34,6 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: bash tests/commit-message.sh --text "$PR_TITLE"
 
-      - name: Test pull request body rules
-        run: bash tests/pr-body-test.sh
-
       - name: Check the pull request body
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
