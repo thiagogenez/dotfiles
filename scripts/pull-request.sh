@@ -21,7 +21,9 @@ fail() {
 }
 
 require_value() {
-    [ "$#" -ge 2 ] && [ -n "$2" ] || fail "$1 requires a value"
+    if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+        fail "$1 requires a value"
+    fi
 }
 
 validate_issue() {
