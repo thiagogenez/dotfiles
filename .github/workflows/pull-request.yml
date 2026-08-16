@@ -1,0 +1,43 @@
+name: Pull request metadata
+
+on:
+  pull_request:
+    types:
+      - edited
+      - opened
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+
+jobs:
+  metadata:
+    name: Commit messages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check the commits this pull request adds
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash tests/commit-message.sh "$BASE_SHA..$HEAD_SHA"
+
+      - name: Check the pull request title
+        # A squash merge takes the title as the commit subject, so it has to
+        # satisfy the same rules as the commits themselves.
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: bash tests/commit-message.sh --text "$PR_TITLE"
+
+      - name: Test pull request body rules
+        run: bash tests/pr-body-test.sh
+
+      - name: Check the pull request body
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: bash tests/pr-body.sh --text "$PR_BODY"

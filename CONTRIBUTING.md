@@ -53,6 +53,7 @@ shfmt -d -i 4 -ci -kp ./*.sh lib/*.sh tests/*.sh
 bash tests/install-uninstall.sh
 bash tests/architecture.sh
 bash tests/commit-message.sh
+bash tests/pr-body-test.sh
 ```
 
 `./doctor.sh` reports whether the current machine's installation is healthy. It
@@ -143,6 +144,9 @@ why, and always for breaking changes, security fixes, and reverts.
 The body has six sections, and the template gives you the headings: the problem,
 what it looked like before, what it looks like after, how it is implemented, how
 you validated it, and what the change does not cover.
+
+All six headings are required. Do not rename or drop one to fit another pull
+request format.
 
 Before and after show the same input twice, with the wrong result and then the
 right one. That is what lets a reviewer judge the change without reconstructing
