@@ -101,3 +101,36 @@ jobs:
           else
             /bin/bash tests/architecture.sh
           fi
+
+  coverage:
+    name: Shell coverage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2.3"
+
+      - name: Install coverage tools
+        run: |
+          gem install bashcov --version 3.3.0 --no-document
+          gem install simplecov-cobertura --version 3.1.2 --no-document
+
+      - name: Generate coverage report
+        run: |
+          bashcov --bash-path /bin/bash tests/install-uninstall.sh
+          bashcov --bash-path /bin/bash tests/architecture.sh
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          disable_search: true
+          fail_ci_if_error: true
+          files: coverage/coverage.xml
+          use_oidc: true
