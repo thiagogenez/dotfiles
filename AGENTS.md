@@ -109,7 +109,8 @@ Six sections, in this order.
 `Before` and `After` show the same input twice so a reviewer can judge the fix
 without reconstructing the failure. Where a change has no observable behaviour,
 documentation for instance, they become what a reader had and what a reader
-gets. A section with nothing honest to put in it should be dropped, not filled.
+gets. All six headings are required: do not rename or drop one to fit a generic
+publishing template, and do not fabricate content to fill one.
 
 `Found on the way` is a useful seventh section for something true that the
 change did not set out to find.
@@ -160,11 +161,13 @@ run.
 Run these before opening a pull request:
 
 ```bash
-shellcheck -x ./*.sh lib/*.sh tests/*.sh
-shfmt -d -i 4 -ci -kp ./*.sh lib/*.sh tests/*.sh
+shellcheck -x ./*.sh lib/*.sh scripts/*.sh tests/*.sh
+shfmt -d -i 4 -ci -kp ./*.sh lib/*.sh scripts/*.sh tests/*.sh
 bash tests/install-uninstall.sh
 bash tests/architecture.sh
 bash tests/commit-message.sh
+bash tests/pr-body-test.sh
+bash tests/pull-request-test.sh
 ```
 
 `./doctor.sh` reports whether the current machine's installation is healthy. It
