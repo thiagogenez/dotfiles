@@ -145,6 +145,92 @@ grep -Fq "hand-edited installed copy" \
 HOME="$fresh_home" XDG_CONFIG_HOME="$fresh_home/.config" XDG_STATE_HOME="$fresh_state" DOTFILES_PRIVATE_ROOT="$no_private" \
     "$repo/update.sh" >/dev/null || fail "update failed with nothing installed"
 
+# --- custom XDG configuration home ------------------------------------------
+
+xdg_home="$test_root/xdg-home"
+xdg_config="$xdg_home/custom-config"
+xdg_state="$test_root/xdg-state"
+xdg_prefix="$xdg_home/.local/share/dotfiles"
+mkdir -p "$xdg_config/git" "$xdg_home/.config"
+printf '%s\n' "original XDG Git configuration" >"$xdg_config/git/config"
+
+run_xdg() {
+    HOME="$xdg_home" XDG_CONFIG_HOME="$xdg_config" XDG_STATE_HOME="$xdg_state" \
+        DOTFILES_PRIVATE_ROOT="$no_private" "$@"
+}
+
+# Simulate the target written by older versions. Only a link owned by this
+# installer may be removed; ordinary files at the default location stay put.
+ln -s "$xdg_prefix/git" "$xdg_home/.config/git"
+run_xdg "$repo/install.sh" git >/dev/null
+
+assert_link "$xdg_config/git" "$xdg_prefix/git"
+assert_absent "$xdg_home/.config/git"
+[ "$(run_xdg git config --global --get alias.st)" = "status" ] ||
+    fail "Git did not read its configuration from XDG_CONFIG_HOME"
+grep -Fqx "original XDG Git configuration" \
+    "$xdg_state/dotfiles-installer/backups/xdg-config/git/config" ||
+    fail "the original XDG Git configuration was not preserved"
+
+run_xdg "$repo/doctor.sh" >/dev/null ||
+    fail "doctor rejected a healthy custom XDG installation"
+
+# A link at the old default location must not make doctor report success.
+unlink "$xdg_config/git"
+ln -s "$xdg_prefix/git" "$xdg_home/.config/git"
+case "$(run_xdg "$repo/doctor.sh" 2>&1 || true)" in
+    *"$xdg_config/git is missing"*) ;;
+    *) fail "doctor accepted a Git link outside XDG_CONFIG_HOME" ;;
+esac
+
+run_xdg "$repo/update.sh" >/dev/null
+assert_link "$xdg_config/git" "$xdg_prefix/git"
+assert_absent "$xdg_home/.config/git"
+
+run_xdg "$repo/uninstall.sh" git >/dev/null
+grep -Fqx "original XDG Git configuration" "$xdg_config/git/config" ||
+    fail "uninstall did not restore the XDG Git configuration"
+assert_absent "$xdg_home/.config/git"
+assert_absent "$xdg_prefix"
+assert_absent "$xdg_state/dotfiles-installer/backups"
+
+# Uninstall also recognizes a component installed before XDG_CONFIG_HOME was
+# honored, even when the corrected target has not been created yet.
+migration_home="$test_root/xdg-migration-home"
+migration_state="$test_root/xdg-migration-state"
+mkdir -p "$migration_home/.config/git"
+printf '%s\n' "original default Git configuration" \
+    >"$migration_home/.config/git/config"
+HOME="$migration_home" XDG_CONFIG_HOME="$migration_home/.config" \
+    XDG_STATE_HOME="$migration_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+    "$repo/install.sh" git >/dev/null
+mkdir -p "$migration_home/custom-config/git"
+printf '%s\n' "original custom Git configuration" \
+    >"$migration_home/custom-config/git/config"
+HOME="$migration_home" XDG_CONFIG_HOME="$migration_home/custom-config" \
+    XDG_STATE_HOME="$migration_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+    "$repo/update.sh" >/dev/null
+assert_link "$migration_home/custom-config/git" \
+    "$migration_home/.local/share/dotfiles/git"
+grep -Fqx "original default Git configuration" \
+    "$migration_home/.config/git/config" ||
+    fail "migration did not restore the default Git configuration"
+grep -Fqx "original custom Git configuration" \
+    "$migration_state/dotfiles-installer/backups/xdg-config/git/config" ||
+    fail "migration did not preserve the custom Git configuration"
+
+HOME="$migration_home" XDG_CONFIG_HOME="$migration_home/custom-config" \
+    XDG_STATE_HOME="$migration_state" DOTFILES_PRIVATE_ROOT="$no_private" \
+    "$repo/uninstall.sh" git >/dev/null
+grep -Fqx "original default Git configuration" \
+    "$migration_home/.config/git/config" ||
+    fail "uninstall changed the restored default Git configuration"
+grep -Fqx "original custom Git configuration" \
+    "$migration_home/custom-config/git/config" ||
+    fail "uninstall did not restore the custom Git configuration"
+assert_absent "$migration_home/.local/share/dotfiles"
+assert_absent "$migration_state/dotfiles-installer/backups"
+
 # --- an edit to the installed copy is detected and preserved -----------------
 
 # The installer must tell a local edit apart from a stale checkout. Both look

@@ -48,7 +48,8 @@ assert_agent_skill_link "$repo/.claude/skills/dotfiles-change"
 assert_agent_skill_link "$repo/.codex/skills/dotfiles-change"
 
 run() {
-    HOME="$home" XDG_STATE_HOME="$state" DOTFILES_PRIVATE_ROOT="$overlay" "$@"
+    HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_STATE_HOME="$state" \
+        DOTFILES_PRIVATE_ROOT="$overlay" "$@"
 }
 
 # No link anywhere under $HOME may point into either checkout.

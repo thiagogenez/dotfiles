@@ -47,9 +47,23 @@ dotfiles_component_source() {
 
 dotfiles_component_target() {
     case "$1" in
-        git)   printf '%s' ".config/git" ;;
-        ssh)   printf '%s' ".ssh/config" ;;
-        gnupg) printf '%s' ".gnupg/gpg-agent.conf" ;;
+        git)   printf '%s' "$DOTFILES_CONFIG_HOME/git" ;;
+        ssh)   printf '%s' "$HOME/.ssh/config" ;;
+        gnupg) printf '%s' "$HOME/.gnupg/gpg-agent.conf" ;;
+    esac
+}
+
+dotfiles_component_backup() {
+    case "$1" in
+        git)
+            if [ "$DOTFILES_CONFIG_HOME" = "$HOME/.config" ]; then
+                printf '%s' "$DOTFILES_BACKUP_ROOT/.config/git"
+            else
+                printf '%s' "$DOTFILES_BACKUP_ROOT/xdg-config/git"
+            fi
+            ;;
+        ssh)   printf '%s' "$DOTFILES_BACKUP_ROOT/.ssh/config" ;;
+        gnupg) printf '%s' "$DOTFILES_BACKUP_ROOT/.gnupg/gpg-agent.conf" ;;
     esac
 }
 
@@ -69,14 +83,28 @@ dotfiles_component_available() {
 dotfiles_component_owned() {
     local source target
     source="$(dotfiles_component_source "$1")"
-    target="$HOME/$(dotfiles_component_target "$1")"
+    target="$(dotfiles_component_target "$1")"
     [ -L "$target" ] && [ "$(readlink "$target")" = "$source" ]
 }
 
+dotfiles_component_obsolete_owned() {
+    local id="$1" obsolete="$HOME/.config/git" target source origin link
+
+    [ "$id" = "git" ] || return 1
+    target="$(dotfiles_component_target "$id")"
+    [ "$obsolete" != "$target" ] || return 1
+    [ -L "$obsolete" ] || return 1
+
+    source="$(dotfiles_component_source "$id")"
+    origin="$(dotfiles_component_origin "$id")"
+    link="$(readlink "$obsolete")"
+    [ "$link" = "$source" ] || [ "$link" = "$origin" ]
+}
+
 dotfiles_component_has_backup() {
-    local target
-    target="$(dotfiles_component_target "$1")"
-    [ -e "$DOTFILES_BACKUP_ROOT/$target" ] || [ -L "$DOTFILES_BACKUP_ROOT/$target" ]
+    local backup
+    backup="$(dotfiles_component_backup "$1")"
+    [ -e "$backup" ] || [ -L "$backup" ]
 }
 
 dotfiles_component_selectable() {
@@ -85,7 +113,8 @@ dotfiles_component_selectable() {
     if [ "$action" = "install" ]; then
         dotfiles_component_available "$id"
     else
-        dotfiles_component_owned "$id" || dotfiles_component_has_backup "$id"
+        dotfiles_component_owned "$id" || dotfiles_component_obsolete_owned "$id" ||
+            dotfiles_component_has_backup "$id"
     fi
 }
 
@@ -571,7 +600,7 @@ dotfiles_check_prefix() {
 }
 
 dotfiles_install_link() {
-    local source="$1" target="$HOME/$2" backup="$DOTFILES_BACKUP_ROOT/$2" origin="${3:-}"
+    local source="$1" target="$2" backup="$3" origin="${4:-}"
     DOTFILES_LINK_CHANGED=0
 
     if [ -L "$target" ] && [ "$(readlink "$target")" = "$source" ]; then
@@ -604,7 +633,7 @@ dotfiles_install_link() {
 }
 
 dotfiles_uninstall_link() {
-    local source="$1" target="$HOME/$2" backup="$DOTFILES_BACKUP_ROOT/$2"
+    local source="$1" target="$2" backup="$3"
     DOTFILES_LINK_CHANGED=0
 
     if [ -L "$target" ] && [ "$(readlink "$target")" = "$source" ]; then
@@ -621,6 +650,21 @@ dotfiles_uninstall_link() {
         mv "$backup" "$target"
         DOTFILES_LINK_CHANGED=1
         echo "restored $target"
+    fi
+}
+
+dotfiles_migrate_obsolete_git_link() {
+    local id="$1" obsolete="$HOME/.config/git"
+    local backup="$DOTFILES_BACKUP_ROOT/.config/git"
+
+    dotfiles_component_obsolete_owned "$id" || return 0
+    unlink "$obsolete"
+    echo "removed obsolete link $obsolete"
+
+    if [ -e "$backup" ] || [ -L "$backup" ]; then
+        mkdir -p "$(dirname "$obsolete")"
+        mv "$backup" "$obsolete"
+        echo "restored $obsolete"
     fi
 }
 
@@ -658,6 +702,7 @@ dotfiles_cleanup_state() {
     fi
 
     rmdir "$DOTFILES_BACKUP_ROOT/.config" 2>/dev/null || true
+    rmdir "$DOTFILES_BACKUP_ROOT/xdg-config" 2>/dev/null || true
     rmdir "$DOTFILES_BACKUP_ROOT/.ssh" 2>/dev/null || true
     rmdir "$DOTFILES_BACKUP_ROOT/.gnupg" 2>/dev/null || true
     rmdir "$DOTFILES_BACKUP_ROOT" 2>/dev/null || true
@@ -676,7 +721,7 @@ dotfiles_cleanup_state() {
 }
 
 dotfiles_process_components() {
-    local action="$1" index=0 component source origin target failed=0 reload_gpg=0
+    local action="$1" index=0 component source origin target backup failed=0 reload_gpg=0
 
     if [ "$action" = "install" ]; then
         mkdir -p "$DOTFILES_STATE_ROOT" "$DOTFILES_COMPONENTS_ROOT"
@@ -691,11 +736,14 @@ dotfiles_process_components() {
         source="$(dotfiles_component_source "$component")"
         origin="$(dotfiles_component_origin "$component")"
         target="$(dotfiles_component_target "$component")"
+        backup="$(dotfiles_component_backup "$component")"
 
         if [ "$action" = "install" ]; then
-            dotfiles_install_link "$source" "$target" "$origin"
+            dotfiles_install_link "$source" "$target" "$backup" "$origin"
+            dotfiles_migrate_obsolete_git_link "$component"
             touch "$DOTFILES_COMPONENTS_ROOT/$component"
-        elif dotfiles_uninstall_link "$source" "$target"; then
+        elif dotfiles_uninstall_link "$source" "$target" "$backup"; then
+            dotfiles_migrate_obsolete_git_link "$component"
             if [ -e "$DOTFILES_COMPONENTS_ROOT/$component" ]; then
                 unlink "$DOTFILES_COMPONENTS_ROOT/$component"
             fi
@@ -741,7 +789,7 @@ dotfiles_select_installed() {
 # Refresh the installed copy from the source checkout. Links are only touched
 # when they are missing or point somewhere unexpected.
 dotfiles_update() {
-    local index=0 component source origin target relinked=0
+    local index=0 component source origin target backup relinked=0
 
     dotfiles_select_installed
     if [ "$DOTFILES_SELECTED_COUNT" -eq 0 ]; then
@@ -764,18 +812,20 @@ dotfiles_update() {
         source="$(dotfiles_component_source "$component")"
         origin="$(dotfiles_component_origin "$component")"
         target="$(dotfiles_component_target "$component")"
+        backup="$(dotfiles_component_backup "$component")"
         index=$((index + 1))
 
         dotfiles_component_owned "$component" && continue
 
         if [ "$DOTFILES_DRY_RUN" -eq 1 ]; then
-            echo "  would relink $HOME/$target -> $source"
+            echo "  would relink $target -> $source"
             relinked=1
             continue
         fi
 
         echo
-        dotfiles_install_link "$source" "$target" "$origin"
+        dotfiles_install_link "$source" "$target" "$backup" "$origin"
+        dotfiles_migrate_obsolete_git_link "$component"
         relinked=1
     done
 
@@ -831,7 +881,7 @@ dotfiles_doctor_links() {
         [ -e "$DOTFILES_COMPONENTS_ROOT/$id" ] || continue
 
         source="$(dotfiles_component_source "$id")"
-        target="$HOME/$(dotfiles_component_target "$id")"
+        target="$(dotfiles_component_target "$id")"
 
         if [ ! -L "$target" ]; then
             if [ -e "$target" ]; then
@@ -854,11 +904,15 @@ dotfiles_doctor_links() {
 # The rule the design rests on: nothing in $HOME may resolve into a checkout.
 dotfiles_doctor_boundary() {
     local link target found=0 listing
+    local roots=("$HOME/.config" "$HOME/.ssh" "$HOME/.gnupg" "$DOTFILES_DATA_HOME")
+
+    if [ "$DOTFILES_CONFIG_HOME" != "$HOME/.config" ]; then
+        roots[${#roots[@]}]="$DOTFILES_CONFIG_HOME"
+    fi
 
     # A missing directory makes find exit non-zero, which under set -e would
     # abort the whole check rather than skip one path.
-    listing="$(find "$HOME/.config" "$HOME/.ssh" "$HOME/.gnupg" "$DOTFILES_DATA_HOME" \
-        -type l 2>/dev/null || true)"
+    listing="$(find "${roots[@]}" -type l 2>/dev/null || true)"
     while IFS= read -r link; do
         [ -n "$link" ] || continue
         target="$(readlink "$link")"
@@ -1109,6 +1163,7 @@ dotfiles_main() {
 
     DOTFILES_REPO="$repo"
     DOTFILES_PRIVATE_REPO="${DOTFILES_PRIVATE_ROOT:-$(dirname "$repo")/dotfiles-private}"
+    DOTFILES_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
     DOTFILES_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
     DOTFILES_PREFIX="$DOTFILES_DATA_HOME/dotfiles"
     DOTFILES_PRIVATE_PREFIX="$DOTFILES_DATA_HOME/dotfiles-private"
@@ -1119,9 +1174,10 @@ dotfiles_main() {
     DOTFILES_DRY_RUN=0
     DOTFILES_SYNC_CHANGED=0
     DOTFILES_LOCAL_EDITS=0
-    export DOTFILES_REPO DOTFILES_PRIVATE_REPO DOTFILES_DATA_HOME DOTFILES_PREFIX \
-        DOTFILES_PRIVATE_PREFIX DOTFILES_STATE_ROOT DOTFILES_BACKUP_ROOT \
-        DOTFILES_COMPONENTS_ROOT DOTFILES_MANIFEST_ROOT
+    export DOTFILES_REPO DOTFILES_PRIVATE_REPO DOTFILES_CONFIG_HOME \
+        DOTFILES_DATA_HOME DOTFILES_PREFIX DOTFILES_PRIVATE_PREFIX \
+        DOTFILES_STATE_ROOT DOTFILES_BACKUP_ROOT DOTFILES_COMPONENTS_ROOT \
+        DOTFILES_MANIFEST_ROOT
 
     if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
         dotfiles_usage "$action"
