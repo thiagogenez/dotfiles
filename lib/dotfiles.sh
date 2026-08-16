@@ -10,6 +10,50 @@ DOTFILES_COMPONENT_IDS=(git ssh gnupg)
 DOTFILES_SELECTED=()
 DOTFILES_SELECTED_COUNT=0
 
+dotfiles_ansi_enabled() {
+    local fd="$1"
+    [ -t "$fd" ] && [ -z "${NO_COLOR+x}" ] && [ "${TERM:-}" != "dumb" ]
+}
+
+dotfiles_style() {
+    local fd="$1" style="$2" text="$3"
+
+    if dotfiles_ansi_enabled "$fd"; then
+        printf '\033[%sm%s\033[0m' "$style" "$text"
+    else
+        printf '%s' "$text"
+    fi
+}
+
+dotfiles_clear_line() {
+    local fd="$1"
+    if dotfiles_ansi_enabled "$fd"; then
+        printf '\r\033[2K'
+    fi
+}
+
+dotfiles_move_up() {
+    local fd="$1" lines="$2"
+    if dotfiles_ansi_enabled "$fd"; then
+        printf '\033[%dA' "$lines"
+    fi
+}
+
+dotfiles_step() {
+    dotfiles_style 1 '1;36' '==>'
+    printf ' %s\n' "$1"
+}
+
+dotfiles_warn() {
+    dotfiles_style 2 '1;33' 'Warning:' >&2
+    printf ' %s\n' "$1" >&2
+}
+
+dotfiles_error() {
+    dotfiles_style 2 '1;31' 'Error:' >&2
+    printf ' %s\n' "$1" >&2
+}
+
 dotfiles_component_name() {
     case "$1" in
         git)   printf '%s' "Git" ;;
@@ -168,15 +212,15 @@ dotfiles_parse_selection() {
 
     while [ "$#" -gt 0 ]; do
         if ! dotfiles_component_known "$1"; then
-            echo "Unknown component: $1" >&2
+            dotfiles_error "Unknown component: $1"
             echo "Available components: ${DOTFILES_COMPONENT_IDS[*]}" >&2
             return 2
         fi
         if ! dotfiles_component_selectable "$action" "$1"; then
             if [ "$action" = "install" ]; then
-                echo "Cannot install $(dotfiles_component_name "$1"): missing $(dotfiles_component_source "$1")" >&2
+                dotfiles_error "Cannot install $(dotfiles_component_name "$1"): missing $(dotfiles_component_source "$1")"
             else
-                echo "Cannot uninstall $(dotfiles_component_name "$1"): it is not installed by this clone" >&2
+                dotfiles_error "Cannot uninstall $(dotfiles_component_name "$1"): it is not installed by this clone"
             fi
             return 1
         fi
@@ -206,10 +250,12 @@ dotfiles_render_menu() {
     local count="${#DOTFILES_COMPONENT_IDS[@]}" index id marker pointer status suffix
 
     if [ "$redraw" -eq 1 ]; then
-        printf '\033[%dA' "$((count + 3))" >&4
+        dotfiles_move_up 4 "$((count + 3))" >&4
     fi
 
-    printf '\r\033[2K\033[1;36m?\033[0m Select components to %s\n' "$action" >&4
+    dotfiles_clear_line 4 >&4
+    dotfiles_style 4 '1;36' '?' >&4
+    printf ' Select components to %s\n' "$action" >&4
     index=0
     while [ "$index" -lt "$count" ]; do
         id="${DOTFILES_COMPONENT_IDS[$index]}"
@@ -228,12 +274,20 @@ dotfiles_render_menu() {
         suffix=""
         [ -n "$status" ] && suffix=" — $status"
 
-        printf '\r\033[2K  %s [%s] \033[1m%s\033[0m — %s\033[2m%s\033[0m\n' \
-            "$pointer" "$marker" "$(dotfiles_component_name "$id")" \
-            "$(dotfiles_component_description "$id")" "$suffix" >&4
+        dotfiles_clear_line 4 >&4
+        printf '  %s [%s] ' "$pointer" "$marker" >&4
+        dotfiles_style 4 '1' "$(dotfiles_component_name "$id")" >&4
+        printf ' — %s' "$(dotfiles_component_description "$id")" >&4
+        dotfiles_style 4 '2' "$suffix" >&4
+        printf '\n' >&4
         index=$((index + 1))
     done
-    printf '\r\033[2K\n\r\033[2K  \033[2m↑/↓ move • space toggle • a all • enter confirm • q cancel\033[0m\n' >&4
+    dotfiles_clear_line 4 >&4
+    printf '\n' >&4
+    dotfiles_clear_line 4 >&4
+    printf '  ' >&4
+    dotfiles_style 4 '2' '↑/↓ move • space toggle • a all • enter confirm • q cancel' >&4
+    printf '\n' >&4
 }
 
 dotfiles_open_terminal() {
@@ -356,7 +410,7 @@ dotfiles_print_selection() {
         return
     fi
 
-    echo "Components to $action:"
+    dotfiles_step "Components to $action:"
     while [ "$index" -lt "$DOTFILES_SELECTED_COUNT" ]; do
         id="${DOTFILES_SELECTED[$index]}"
         echo "  • $(dotfiles_component_name "$id")"
@@ -550,14 +604,14 @@ dotfiles_check_config_dir() {
     [ -d "$checkout" ] || return 0
 
     if [ ! -d "$checkout/config" ]; then
-        echo "Warning: $label at $checkout has no config/ directory." >&2
+        dotfiles_warn "$label at $checkout has no config/ directory."
         echo "         Nothing from it will be published. Payload belongs in" >&2
         echo "         $checkout/config/{git,ssh,gnupg}." >&2
         return 0
     fi
 
     case "$(echo "$checkout"/config/*/)" in
-        *'/config/*/') echo "Warning: $checkout/config is empty, so nothing will be published." >&2 ;;
+        *'/config/*/') dotfiles_warn "$checkout/config is empty, so nothing will be published." ;;
     esac
 }
 
@@ -579,7 +633,7 @@ dotfiles_sync_payload() {
 
     if [ "$DOTFILES_LOCAL_EDITS" -eq 1 ]; then
         echo
-        echo "The installed copy carried edits that were not made in the checkout," >&2
+        dotfiles_warn "The installed copy carried edits that were not made in the checkout,"
         echo "so they have been copied into $DOTFILES_BACKUP_ROOT/local before" >&2
         echo "being replaced. This happens when a tool writes through a link, as" >&2
         echo "'git config --global' does. Move anything worth keeping into the" >&2
@@ -594,7 +648,7 @@ dotfiles_check_prefix() {
 
     [ "$DOTFILES_DATA_HOME" = "$expected" ] && return 0
 
-    echo "Warning: XDG_DATA_HOME points at $DOTFILES_DATA_HOME," >&2
+    dotfiles_warn "XDG_DATA_HOME points at $DOTFILES_DATA_HOME,"
     echo "         but the Git and SSH includes hard-code $expected." >&2
     echo "         The private overlay will not be picked up." >&2
 }
@@ -617,7 +671,7 @@ dotfiles_install_link() {
 
     if [ -e "$target" ] || [ -L "$target" ]; then
         if [ -e "$backup" ] || [ -L "$backup" ]; then
-            echo "Cannot preserve $target: backup already exists at $backup" >&2
+            dotfiles_error "Cannot preserve $target: backup already exists at $backup"
             return 1
         fi
 
@@ -641,7 +695,7 @@ dotfiles_uninstall_link() {
         DOTFILES_LINK_CHANGED=1
         echo "removed $target"
     elif [ -e "$target" ] || [ -L "$target" ]; then
-        echo "skipped $target (not owned by this clone)" >&2
+        dotfiles_warn "skipped $target (not owned by this clone)"
         return 1
     fi
 
@@ -726,7 +780,7 @@ dotfiles_process_components() {
     if [ "$action" = "install" ]; then
         mkdir -p "$DOTFILES_STATE_ROOT" "$DOTFILES_COMPONENTS_ROOT"
         dotfiles_check_prefix
-        echo "Publishing the source checkout to $DOTFILES_PREFIX:"
+        dotfiles_step "Publishing the source checkout to $DOTFILES_PREFIX:"
         dotfiles_sync_payload
         echo
     fi
@@ -759,7 +813,7 @@ dotfiles_process_components() {
 
     if [ "$failed" -ne 0 ]; then
         echo >&2
-        echo "Uninstall incomplete; preserved backups remain in $DOTFILES_BACKUP_ROOT" >&2
+        dotfiles_error "Uninstall incomplete; preserved backups remain in $DOTFILES_BACKUP_ROOT"
         return 1
     fi
 
@@ -801,9 +855,9 @@ dotfiles_update() {
     dotfiles_print_selection "refresh"
 
     if [ "$DOTFILES_DRY_RUN" -eq 1 ]; then
-        echo "Comparing $DOTFILES_PREFIX with the source checkout:"
+        dotfiles_step "Comparing $DOTFILES_PREFIX with the source checkout:"
     else
-        echo "Publishing the source checkout to $DOTFILES_PREFIX:"
+        dotfiles_step "Publishing the source checkout to $DOTFILES_PREFIX:"
     fi
     dotfiles_sync_payload
 
@@ -849,16 +903,30 @@ dotfiles_update() {
 DOTFILES_DOCTOR_FAILED=0
 
 dotfiles_report() {
-    local status="$1" message="$2"
+    local status="$1" message="$2" label style
     case "$status" in
-        ok) printf '  ok    %s\n' "$message" ;;
-        warn) printf '  warn  %s\n' "$message" ;;
-        skip) printf '  skip  %s\n' "$message" ;;
+        ok)
+            label="ok"
+            style="32"
+            ;;
+        warn)
+            label="warn"
+            style="33"
+            ;;
+        skip)
+            label="skip"
+            style="2"
+            ;;
         bad)
-            printf '  FAIL  %s\n' "$message"
+            label="FAIL"
+            style="1;31"
             DOTFILES_DOCTOR_FAILED=1
             ;;
     esac
+
+    printf '  '
+    dotfiles_style 1 "$style" "$(printf '%-4s' "$label")"
+    printf '  %s\n' "$message"
 }
 
 # Paths inside a configuration file arrive as literal text, so a leading tilde
@@ -1115,22 +1183,22 @@ dotfiles_doctor() {
     echo "Installed: $DOTFILES_PREFIX"
     echo
 
-    echo "Payload"
+    dotfiles_step "Payload"
     dotfiles_doctor_payload
     echo
-    echo "Links"
+    dotfiles_step "Links"
     dotfiles_doctor_links
     echo
-    echo "Boundary"
+    dotfiles_step "Boundary"
     dotfiles_doctor_boundary
     echo
-    echo "Local edits"
+    dotfiles_step "Local edits"
     dotfiles_doctor_local_edits
     echo
-    echo "Resolution"
+    dotfiles_step "Resolution"
     dotfiles_doctor_resolution
     echo
-    echo "Routing"
+    dotfiles_step "Routing"
     dotfiles_doctor_git_routing
     dotfiles_doctor_ssh_routing
     echo
@@ -1151,13 +1219,13 @@ dotfiles_main() {
     case "$action" in
         install | uninstall | update | doctor) ;;
         *)
-            echo "Internal error: unknown action" >&2
+            dotfiles_error "Internal error: unknown action"
             return 2
             ;;
     esac
 
     if [ -z "$repo" ]; then
-        echo "Internal error: repository path is missing" >&2
+        dotfiles_error "Internal error: repository path is missing"
         return 2
     fi
 
@@ -1189,7 +1257,7 @@ dotfiles_main() {
             --check) DOTFILES_DRY_RUN=1 ;;
             "") ;;
             *)
-                echo "Unknown option: $1" >&2
+                dotfiles_error "Unknown option: $1"
                 dotfiles_usage "$action" >&2
                 return 2
                 ;;
