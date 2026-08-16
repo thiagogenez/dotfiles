@@ -68,7 +68,7 @@ discover it. Write "none" only when you have actually considered the question.
 
 ## Checklist
 
-- [ ] `shellcheck -x` passes on the entry points, `lib/`, and `tests/`
+- [ ] `bash scripts/lint.sh` passes
 - [ ] `bash tests/install-uninstall.sh` passes
 - [ ] Nothing under `$HOME` resolves into the source checkout
 - [ ] No key material, credentials, or identities added to this repository

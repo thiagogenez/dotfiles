@@ -71,6 +71,11 @@ Run the focused regression first, then every local check from `AGENTS.md` before
 handoff. Report each command and its actual result. If a check cannot run, say
 why and what remains unverified.
 
+Before handing the signed commit command to the repository owner, run
+`bash scripts/setup-hooks.sh --check`. If it fails, explicitly ask the owner to
+run `bash scripts/setup-hooks.sh` before committing. A checked-in hook is not
+active merely because the repository contains `.githooks/pre-commit`.
+
 Before creating a pull request, use the repository-owned helper rather than a
 generic publishing workflow:
 

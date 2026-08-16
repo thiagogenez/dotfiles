@@ -12,13 +12,18 @@ on:
 permissions:
   contents: read
 
+# Checksums are deliberately kept whole so they can be copied and verified.
+# yamllint disable rule:line-length
 env:
   # Binaries are pinned and checksum-verified rather than pulled through a
   # third-party action, so the supply chain here is GitHub releases only.
+  SHELLCHECK_VERSION: v0.11.0
+  SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
   SHFMT_VERSION: v3.13.1
   SHFMT_SHA256: fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
   GITLEAKS_VERSION: 8.30.1
   GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+# yamllint enable rule:line-length
 
 jobs:
   lint:
@@ -28,8 +33,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Run ShellCheck
-        run: shellcheck -x ./*.sh lib/*.sh scripts/*.sh tests/*.sh
+      - name: Install ShellCheck
+        run: |
+          curl -fsSL -o /tmp/shellcheck.tar.xz \
+            "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          echo "${SHELLCHECK_SHA256}  /tmp/shellcheck.tar.xz" | sha256sum -c -
+          tar -xJf /tmp/shellcheck.tar.xz -C /tmp
+          chmod +x "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck"
 
       - name: Install shfmt
         run: |
@@ -38,13 +48,17 @@ jobs:
           echo "${SHFMT_SHA256}  /tmp/shfmt" | sha256sum -c -
           chmod +x /tmp/shfmt
 
-      - name: Check formatting
-        run: /tmp/shfmt -d -i 4 -ci -kp ./*.sh lib/*.sh scripts/*.sh tests/*.sh
+      - name: Run shell lint
+        env:
+          DOTFILES_SHELLCHECK_BIN: /tmp/shellcheck-v0.11.0/shellcheck
+          DOTFILES_SHFMT_BIN: /tmp/shfmt
+        run: bash scripts/lint.sh
 
       - name: Test pull request tooling
         run: |
           bash tests/pr-body-test.sh
           bash tests/pull-request-test.sh
+          bash tests/pre-commit-test.sh
 
       - name: Run Markdownlint
         uses: DavidAnson/markdownlint-cli2-action@v24
