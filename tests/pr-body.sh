@@ -46,6 +46,10 @@ validate_body() {
     local evidence=(0 0 0 0 0 0)
 
     while IFS= read -r line || [ -n "$line" ]; do
+        # GitHub stores a pull request body with CRLF line endings, so every
+        # heading and fence arrives with a trailing carriage return.
+        line=${line%$'\r'}
+
         if [ "$in_fence" -eq 1 ]; then
             if [ "$line" = '```' ]; then
                 if [ "$fence_section" -ge 0 ] &&
