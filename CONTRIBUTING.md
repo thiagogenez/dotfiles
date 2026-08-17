@@ -170,15 +170,17 @@ you validated it, and what the change does not cover.
 All six headings are required. Do not rename or drop one to fit another pull
 request format.
 
-The repository helper prepares that template and validates it before opening a
-pull request:
+Start from the template, fill it in, and check it before you open the pull
+request. GitHub offers the template in the web form; from a terminal, copy it:
 
 ```bash
-bash scripts/pull-request.sh prepare --issue 42 --output /tmp/pr-42.md
-# Fill the prepared body, then push the branch.
-bash scripts/pull-request.sh create --issue 42 \
-    --title 'fix: describe the correction' --body-file /tmp/pr-42.md
+cp .github/pull_request_template.md /tmp/pr-42.md
+# Fill every section, write the Closes #42 line, then push the branch.
+bash tests/pr-body.sh --file /tmp/pr-42.md
+gh pr create --title 'fix: describe the correction' --body-file /tmp/pr-42.md
 ```
+
+The same check runs in CI, so a body that passes locally passes there.
 
 Before and after show the same input twice, with the wrong result and then the
 right one. That is what lets a reviewer judge the change without reconstructing
