@@ -76,21 +76,19 @@ Before handing the signed commit command to the repository owner, run
 run `bash scripts/setup-hooks.sh` before committing. A checked-in hook is not
 active merely because the repository contains `.githooks/pre-commit`.
 
-Before creating a pull request, use the repository-owned helper rather than a
-generic publishing workflow:
+Build the pull request body from `.github/pull_request_template.md`, not from a
+generic publishing template. Validate it before opening or editing a pull
+request:
 
 ```bash
-bash scripts/pull-request.sh prepare --issue NUMBER --output PATH_TO_PR_BODY
-# Fill every section with real evidence, then push the branch.
-bash scripts/pull-request.sh create --issue NUMBER --title TITLE \
-    --body-file PATH_TO_PR_BODY
+cp .github/pull_request_template.md PATH_TO_PR_BODY
+# Fill every section with real evidence, add the Closes #NUMBER line, then push.
+bash tests/pr-body.sh --file PATH_TO_PR_BODY
+gh pr create --title TITLE --body-file PATH_TO_PR_BODY
 ```
 
-The helper derives the body from `.github/pull_request_template.md` and refuses
-to call GitHub until the local title, body, issue reference, branch, and pushed
-commit pass their checks. Use `bash tests/pr-body.sh --file PATH_TO_PR_BODY`
-before editing the body of an existing pull request. Do not substitute a generic
-publishing template for the repository's headings.
+Push the branch before opening the pull request, and keep the repository's six
+headings. CI checks the title, the commits, and the body again.
 
 Stop when the acceptance conditions pass. Report:
 

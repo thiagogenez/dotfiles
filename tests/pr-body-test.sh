@@ -99,7 +99,11 @@ empty_problem=${valid_body/A publishing tool can omit the local headings./}
 empty_before=${valid_body/before evidence/}
 empty_after=${valid_body/after evidence/}
 
+# GitHub hands the workflow a body with CRLF line endings.
+crlf_body=$(printf '%s' "$valid_body" | sed 's/$/\r/')
+
 expect_accept "complete template" "$valid_body"
+expect_accept "body stored with CRLF" "$crlf_body"
 [ ! -e "$marker" ] || fail "body content was evaluated as shell code"
 expect_reject "former #41 headings" "$generic_body"
 expect_reject "missing section" "$missing_body"

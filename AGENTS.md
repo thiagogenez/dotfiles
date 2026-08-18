@@ -170,7 +170,6 @@ bash tests/install-uninstall.sh
 bash tests/architecture.sh
 bash tests/commit-message.sh
 bash tests/pr-body-test.sh
-bash tests/pull-request-test.sh
 bash tests/pre-commit-test.sh
 ```
 
