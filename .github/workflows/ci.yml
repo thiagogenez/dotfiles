@@ -66,7 +66,7 @@ jobs:
           bash tests/pre-commit-test.sh
 
       - name: Run Markdownlint
-        uses: DavidAnson/markdownlint-cli2-action@v24
+        uses: DavidAnson/markdownlint-cli2-action@v25
         with:
           globs: "**/*.md"
 
@@ -147,7 +147,7 @@ jobs:
           bashcov --bash-path /bin/bash tests/architecture.sh
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           disable_search: true
           fail_ci_if_error: false
